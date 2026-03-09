@@ -2,6 +2,8 @@
 
 PhishGuard scans your inbox for phishing and malicious emails using an AI model plus rule-based checks (wording + links/identifiers).
 
+**See [CHANGELOG.md](CHANGELOG.md)** for a description of what was changed and why (risk classification, trusted senders, OpenAI, extension UI, etc.).
+
 ---
 
 ## One branch, run from root (no switching)
