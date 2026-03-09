@@ -1,0 +1,37 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.so
+.env
+.env.local
+.env.*.local
+.eggs/
+*.egg-info/
+*.egg
+
+# ML models (optional: remove this line if you want to commit the trained model)
+# ml/models/*.joblib
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# Logs and temp
+*.log
+sentinel/logs.json
+
+# Node (for UI)
+ui/node_modules/
+ui copy/node_modules/
+dist/
+.npm
+
+# Build
+*.manifest

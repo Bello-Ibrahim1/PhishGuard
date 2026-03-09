@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"><title>PhishGuard</title></head>
+<body style="font-family: Inter, Arial, sans-serif; padding: 8px; width: 320px; background: #020617; color: #e6eef7;">
+<h3 style="margin: 0 0 8px 0;">PhishGuard</h3>
+<button id="open" style="padding:8px 10px; border-radius:12px; border:1px solid #3b82f6; background:#3b82f6; color:white; cursor:pointer;">Open Panel</button>
+<script>
+  document.getElementById('open').addEventListener('click', async () => {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    chrome.tabs.sendMessage(tab.id, { cmd: "open_panel" });
+    window.close();
+  });
+</script>
+</body></html>

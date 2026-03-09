@@ -1,0 +1,20 @@
+:root{--color-primary:#3b82f6;--color-bg:#020617;--color-safe:#22c55e;--color-warn:#eab308;--color-danger:#ef4444;--color-accent:#fbbf24;--radius-lg:8px;--radius-xl:12px;--radius-2xl:16px;--radius-3xl:24px;--fs-base:16px;--fs-sm:14px;--fs-lg:20px;--fs-h2:24px;--gap-2:8px;--gap-4:16px;--gap-6:24px;--panel-border:#1f2937;--panel-muted:#1a2330;--text:#e6eef7;--text-sub:#9fb0c4}
+#phishguard-panel{position:fixed;right:16px;bottom:16px;width:360px;max-height:72vh;background:var(--color-bg);color:var(--text);border:1px solid var(--panel-border);border-radius:var(--radius-3xl);box-shadow:0 16px 40px rgba(0,0,0,.35);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;z-index:2147483647;display:flex;flex-direction:column;overflow:hidden}
+#phishguard-header{display:flex;align-items:center;gap:var(--gap-4);padding:12px 16px;border-bottom:1px solid var(--panel-border)}
+#phishguard-header img{width:22px;height:22px}
+#phishguard-header .title{font-weight:700;font-size:var(--fs-base)}
+#phishguard-actions{display:flex;gap:var(--gap-2);padding:10px 16px;border-bottom:1px solid var(--panel-border)}
+.pg-btn{padding:8px 10px;border-radius:var(--radius-xl);border:1px solid var(--panel-border);background:#0b1220;color:var(--text);font-size:var(--fs-sm);cursor:pointer}
+.pg-btn.primary{background:var(--color-primary);border-color:var(--color-primary);color:#fff}
+#phishguard-results{overflow:auto;padding:8px 12px}
+#phishguard-footer{display:flex;align-items:center;gap:var(--gap-4);padding:8px 12px;border-top:1px solid var(--panel-border);font-size:var(--fs-sm);color:var(--text-sub)}
+.pg-progress{height:6px;background:var(--panel-muted);border-radius:999px;overflow:hidden;flex:1}
+.pg-bar{height:100%;width:0%;background:var(--color-primary)}
+.pg-card{background:#0b1220;border:1px solid #1f2937;border-radius:12px;padding:12px;margin-bottom:10px;color:#fff}
+.pg-row{display:flex;justify-content:space-between;gap:12px}
+.pg-title{font-weight:800}
+.pg-sub{opacity:.85;font-size:12px}
+.pg-summary{margin-top:6px;font-size:13px;opacity:.95}
+.pg-right{display:flex;align-items:flex-start}
+.pg-pill{padding:4px 10px;border-radius:999px;font-weight:800;font-size:12px}
+.pg-meta{margin-top:8px;font-size:12px;opacity:.9}

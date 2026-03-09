@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PhishGuard Options</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 16px; max-width: 480px; background: #0f172a; color: #e2e8f0; }
+    h2 { margin-top: 0; }
+    label { display: block; margin-top: 12px; font-weight: 600; }
+    input { width: 100%; padding: 8px; margin-top: 4px; border-radius: 8px; border: 1px solid #334155; background: #1e293b; color: #e2e8f0; box-sizing: border-box; }
+    button { margin-top: 16px; padding: 10px 16px; border-radius: 8px; background: #3b82f6; color: white; border: none; cursor: pointer; font-weight: 600; }
+    button:hover { background: #2563eb; }
+    .hint { font-size: 12px; opacity: 0.8; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h2>PhishGuard Options</h2>
+  <p>Set these when using a <strong>hosted</strong> backend so the extension can reach your API and dashboard.</p>
+  <label>API URL (backend)
+    <input type="text" id="apiBase" placeholder="https://your-api.railway.app or http://localhost:8000">
+    <span class="hint">Leave default for local: http://localhost:8000</span>
+  </label>
+  <label>Dashboard URL (full report page)
+    <input type="text" id="dashboardUrl" placeholder="https://your-dashboard.vercel.app or http://localhost:5173">
+    <span class="hint">Leave default for local: http://localhost:5173</span>
+  </label>
+  <button id="save">Save</button>
+  <script src="options.js"></script>
+</body>
+</html>
