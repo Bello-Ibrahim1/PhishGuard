@@ -18,3 +18,7 @@
 .pg-right{display:flex;align-items:flex-start}
 .pg-pill{padding:4px 10px;border-radius:999px;font-weight:800;font-size:12px}
 .pg-meta{margin-top:8px;font-size:12px;opacity:.9}
+.pg-actions{margin-top:8px;display:flex;gap:6px}
+.pg-btn-safe{padding:4px 10px;border-radius:999px;border:1px solid var(--color-safe);background:transparent;color:var(--color-safe);font-size:11px;cursor:pointer;font-weight:600}
+.pg-btn-safe:hover{background:var(--color-safe);color:#0b1220}
+.pg-btn-safe:disabled{opacity:.4;cursor:default}

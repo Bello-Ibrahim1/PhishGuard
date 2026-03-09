@@ -22,8 +22,11 @@ function buildInboxCard(messageMeta, api) {
   const summary = api?.summary
                || (messageMeta?.subject ? `${messageMeta.subject} — ${messageMeta.snippet||''}` : (messageMeta?.snippet||"No content"));
 
+  const cardId = "pg-card-" + Math.random().toString(36).slice(2, 9);
+
   const el = document.createElement("div");
   el.className = "pg-card";
+  el.id = cardId;
   el.innerHTML = `
     <div class="pg-row">
       <div class="pg-text">
@@ -32,14 +35,39 @@ function buildInboxCard(messageMeta, api) {
         <div class="pg-summary">${esc(summary)}</div>
       </div>
       <div class="pg-right">
-        <span class="pg-pill" style="background:${pillBg};color:#0b1220">${esc(risk)}</span>
+        <span class="pg-pill" style="background:${pillBg};color:#0b1220">${esc(risk)} · ${pct}%</span>
       </div>
     </div>
     <div class="pg-meta">
-      Threat likelihood: <b>${pct}%</b>
-      ${api?.reasons && api.reasons.length ? ` • ${esc(api.reasons.slice(0,2).join(", "))}` : ""}
+      ${api?.reasons?.length ? esc(api.reasons.slice(0, 2).join(" • ")) : "No suspicious signals"}
+    </div>
+    <div class="pg-actions">
+      <button class="pg-btn-safe" data-card="${cardId}" title="Mark this email as safe (not phishing)">✓ Mark as Safe</button>
     </div>
   `;
+
+  el.querySelector(".pg-btn-safe").addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = "Marked safe ✓";
+    btn.style.opacity = "0.5";
+    try {
+      const base = await getApiBase();
+      await fetch(base + "/feedback/safe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: messageMeta?.subject || "",
+          sender: messageMeta?.sender || "",
+          body_preview: summary,
+          risk_was: risk,
+          prob_was: api?.prob ?? null,
+        }),
+      });
+    } catch (_) {}
+  });
+
   return el;
 }
 
