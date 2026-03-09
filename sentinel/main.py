@@ -1,5 +1,5 @@
 import os, json, time
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 from typing import List, Tuple
 from urllib.parse import urlparse
@@ -44,8 +44,9 @@ app.add_middleware(
 class ScoreIn(BaseModel):
     subject: str = ""
     body: str = ""
-    sender: str = ""  # used to allowlist trusted companies (e.g. paypal.com, uber.com)
-    use_openai: bool = True  # when True and OPENAI_API_KEY is set, get a second opinion from OpenAI
+    sender: str = ""      # used to allowlist trusted companies (e.g. paypal.com, uber.com)
+    reply_to: str = ""    # if different from sender, strong phishing signal
+    use_openai: bool = True
 
 
 class BatchEmailItem(BaseModel):
@@ -83,7 +84,13 @@ PHISH_WORDING = [
     "limited time", "expires today", "expires in 24 hours", "final notice", "immediate action",
     "dear sir/madam", "dear beneficiary", "urgent request", "action required",
     "re: your account", "re: payment", "re: verification", "re: suspended",
-    "unsubscribe", "click to unsubscribe", "manage preferences",  # often in phish footers
+]
+# Low-weight phrases: suspicious in isolation but common in legit emails too.
+# Only scored if combined with other signals (handled in _wording_score).
+PHISH_WORDING_WEAK = [
+    "click here", "click below",
+    "unsubscribe", "click to unsubscribe", "manage preferences",
+    "invoice attached", "document attached",
 ]
 # Single-word urgency/credential triggers (strong when combined)
 URGENCY_CRED_WORDS = [
@@ -93,7 +100,10 @@ URGENCY_CRED_WORDS = [
 # Legitimate signals (reduce false positives)
 LEGIT_PATTERNS = [
     r"\b(unsubscribe|view in browser|sent from mail\.|mail\.google\.com)\b",
-    r"\b(notification|newsletter|digest|no-reply@)\b",  # many legit newsletters
+    r"\b(notification|newsletter|digest|no-reply@)\b",
+    r"\b(order confirmation|order #|your receipt|thank you for your (purchase|order|payment))\b",
+    r"\b(tracking number|shipment|your order has (shipped|been placed|been delivered))\b",
+    r"\b(statement|account summary|monthly (statement|summary)|billing statement)\b",
 ]
 # Suspicious sender/identifier patterns (fraud indicators)
 SENDER_SUSPICIOUS = re.compile(
@@ -102,6 +112,38 @@ SENDER_SUSPICIOUS = re.compile(
     re.I
 )
 IP_IN_HOST = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$")
+
+# Brand impersonation: map keyword → set of legitimate domains for that brand
+_BRAND_DOMAINS: dict = {
+    "paypal":           {"paypal.com"},
+    "apple":            {"apple.com", "icloud.com"},
+    "microsoft":        {"microsoft.com", "office.com", "outlook.com", "live.com", "hotmail.com"},
+    "google":           {"google.com", "gmail.com", "accounts.google.com"},
+    "amazon":           {"amazon.com", "amazon.co.uk", "amazon.ca", "amazon.de"},
+    "netflix":          {"netflix.com"},
+    "ebay":             {"ebay.com", "ebay.co.uk"},
+    "chase":            {"chase.com"},
+    "bank of america":  {"bankofamerica.com"},
+    "wellsfargo":       {"wellsfargo.com"},
+    "well fargo":       {"wellsfargo.com"},      # noqa: S1192 shared domain intentional
+    "american express": {"americanexpress.com"},
+    "amex":             {"americanexpress.com"},  # noqa: S1192 shared domain intentional
+    "linkedin":         {"linkedin.com"},
+    "dropbox":          {"dropbox.com"},
+    "docusign":         {"docusign.com", "docusign.net"},
+    "fedex":            {"fedex.com"},
+    "ups":              {"ups.com"},
+    "dhl":              {"dhl.com"},
+    "usps":             {"usps.com"},
+    "irs":              {"irs.gov"},
+}
+
+# Suspicious TLDs commonly used in phishing domains
+_SUSPICIOUS_TLDS = {
+    ".tk", ".ml", ".ga", ".cf", ".gq", ".xyz", ".top", ".work",
+    ".click", ".link", ".email", ".account", ".online", ".site",
+    ".win", ".loan", ".bid", ".stream", ".faith", ".date",
+}
 
 # Trusted sender domains: legitimate brands (payment receipts, order confirmations) not treated as phish
 _TRUSTED_BASE = {
@@ -149,6 +191,62 @@ def _sender_looks_trusted(sender: str) -> bool:
     )
     return any(b in s for b in brands)
 
+def _brand_impersonation_score(text: str, sender_domain: str) -> Tuple[int, List[str]]:
+    """
+    Detect brand impersonation: brand name mentioned in email but sender domain doesn't match.
+    e.g. 'Your PayPal account is suspended' sent from random123.tk → High signal.
+    """
+    score, reasons = 0, []
+    low = text.lower()
+    for brand, legit_domains in _BRAND_DOMAINS.items():
+        if brand in low:
+            if sender_domain and not any(sender_domain == d or sender_domain.endswith("." + d) for d in legit_domains):
+                score += 3
+                reasons.append(f"Brand impersonation: «{brand}» mentioned but sender is «{sender_domain}»")
+                break  # one impersonation signal is enough
+    return min(score, 3), reasons
+
+
+def _check_domain_spoofing(d: str, trusted: set) -> Tuple[int, str]:
+    """Return (score, reason) if domain spoofs a trusted brand."""
+    parts = d.split(".")
+    root_domain = ".".join(parts[-2:]) if len(parts) >= 2 else d
+    if root_domain in trusted:
+        return 0, ""
+    for trusted_d in trusted:
+        brand_root = trusted_d.split(".")[0]
+        if brand_root in d and root_domain != trusted_d:
+            return 3, f"Subdomain spoofing: «{d}» mimics «{trusted_d}»"
+    return 0, ""
+
+
+def _url_suspicion_score(domains: list) -> Tuple[int, List[str]]:
+    """
+    Detect suspicious URL patterns:
+    - Suspicious TLDs in links
+    - Subdomain spoofing: paypal.login.evil.com
+    """
+    score, reasons = 0, []
+    trusted = _trusted_domains()
+
+    for d in domains:
+        for tld in _SUSPICIOUS_TLDS:
+            if d.endswith(tld):
+                score += 2
+                reasons.append(f"Suspicious TLD in link: {d}")
+                break
+
+        sp_score, sp_reason = _check_domain_spoofing(d, trusted)
+        score += sp_score
+        if sp_reason:
+            reasons.append(sp_reason)
+
+        if score >= 5:
+            break
+
+    return min(score, 5), reasons[:3]
+
+
 def extract_urls(text: str):
     urls = URL_RE.findall(text or "")
     domains = []
@@ -169,22 +267,29 @@ def _wording_score(text: str, from_trusted_sender: bool = False) -> Tuple[int, L
     for phrase in PHISH_WORDING:
         if phrase in low:
             score += 2
-            reasons.append(f"Phishing wording: «{phrase[:40]}…»")
+            reasons.append(f"Phishing wording: «{phrase[:40]}»")
             if score >= 6:
                 break
-    for w in URGENCY_CRED_WORDS:
-        if re.search(r"\b" + re.escape(w) + r"\b", low):
-            if from_trusted_sender and w in ("payment", "invoice"):
-                continue
-            score += 1
-            reasons.append(f"Urgency/credential word: {w}")
-            break
+    urgency_hits = [
+        w for w in URGENCY_CRED_WORDS
+        if re.search(r"\b" + re.escape(w) + r"\b", low)
+        and not (from_trusted_sender and w in ("payment", "invoice"))
+    ]
+    if len(urgency_hits) >= 2:
+        score += 1
+        reasons.append(f"Multiple urgency/credential words: {', '.join(urgency_hits[:3])}")
+    # Weak phrases only add +1 if other signals already present (avoids flagging legit newsletters)
+    if score > 0:
+        for phrase in PHISH_WORDING_WEAK:
+            if phrase in low:
+                score += 1
+                reasons.append(f"Suspicious wording: «{phrase[:40]}»")
+                break
     return min(score, 6), reasons[:5]
 
-def _identifier_score(subject: str, body: str, urls: list, domains: list) -> Tuple[int, List[str]]:
+def _identifier_score(urls: list, domains: list) -> Tuple[int, List[str]]:
     """Score 0..5 from suspicious identifiers (sender, domains, IPs)."""
     score, reasons = 0, []
-    text = f"{subject or ''} {body or ''}"
     # Suspicious domains in links
     for d in domains:
         if any(s in d for s in SHORTENERS):
@@ -215,10 +320,20 @@ def _legit_discount(text: str) -> float:
     for pat in LEGIT_PATTERNS:
         if re.search(pat, low):
             discount += 0.15
-    return min(discount, 0.35)
+    return min(discount, 0.50)
 
-def heuristic_score(subject: str, body: str, sender: str = ""):
-    """High-accuracy heuristic: wording + identifiers. Trusted senders get lower wording score."""
+def _reply_to_score(sender: str, reply_to: str, sender_domain: str) -> Tuple[int, str]:
+    """Return (score, reason) if Reply-To domain differs from sender domain."""
+    if not (reply_to and sender):
+        return 0, ""
+    rt_domain = _sender_domain(reply_to)
+    if rt_domain and sender_domain and rt_domain != sender_domain:
+        return 3, f"Reply-To mismatch: sender «{sender_domain}» vs reply-to «{rt_domain}»"
+    return 0, ""
+
+
+def heuristic_score(subject: str, body: str, sender: str = "", reply_to: str = ""):
+    """High-accuracy heuristic: wording + identifiers + impersonation. Trusted senders get lower score."""
     text = f"{subject or ''} {body or ''}".replace("\n", " ")
     urls, domains = extract_urls(body or "")
     domain = _sender_domain(sender)
@@ -231,9 +346,25 @@ def heuristic_score(subject: str, body: str, sender: str = ""):
     score += w_score
     reasons.extend(w_reasons)
 
-    i_score, i_reasons = _identifier_score(subject or "", body or "", urls, domains)
+    i_score, i_reasons = _identifier_score(urls, domains)
     score += i_score
     reasons.extend(i_reasons)
+
+    # Brand impersonation (only when sender domain doesn't match the brand)
+    if not trusted:
+        b_score, b_reasons = _brand_impersonation_score(text, domain)
+        score += b_score
+        reasons.extend(b_reasons)
+
+    # URL suspicious patterns (subdomain spoofing, bad TLDs)
+    u_score, u_reasons = _url_suspicion_score(domains)
+    score += u_score
+    reasons.extend(u_reasons)
+
+    rt_score, rt_reason = _reply_to_score(sender, reply_to, domain)
+    score += rt_score
+    if rt_reason:
+        reasons.append(rt_reason)
 
     if urls and not reasons:
         score += 1
@@ -299,7 +430,7 @@ def scan_batch(inp: BatchScoreIn):
         text = f"{subject} {body}"
         model_out = score_text(text)
         prob = float(model_out.get("prob_phish", 0.0))
-        h_score, h_reasons, urls, domains = heuristic_score(subject, body, sender)
+        h_score, h_reasons, _, _ = heuristic_score(subject, body, sender)  # noqa: urls/domains unused in batch
         total, risk, _ = blend_model_with_heuristics(prob, h_score, trusted_sender=trusted_sender)
         threat_pct = round((prob or (total / 10)) * 100)
         results.append({
@@ -353,6 +484,28 @@ def scan_gmail(max_results: int = 50):
     out = gmail_scan.list_and_score_emails(max_results=max_results, score_fn=score_fn)
     return out
 
+def _apply_openai(subject: str, body: str, sender: str, risk: str, total: int):
+    """Return (risk, total) adjusted by OpenAI verdict, or unchanged on failure."""
+    try:
+        from sentinel.openai_check import openai_verdict
+        verdict = openai_verdict(subject, body, sender)
+        if verdict == "legit":
+            return "Low", min(total, 3)
+        if verdict == "phish" and risk == "Low":
+            return "Medium", max(total, 4)
+    except Exception:
+        pass
+    return risk, total
+
+
+def _summarize(subject: str, body: str) -> str:
+    s = (subject or "").strip()
+    b = (body or "").strip().replace("\n", " ")
+    if len(b) > 140:
+        b = b[:140].rsplit(" ", 1)[0] + "…"
+    return f"{s} — {b}" if s and b else (s or b or "No content")
+
+
 @app.post('/email/score')
 def email_score(inp: ScoreIn):
     subject = inp.subject or ""
@@ -363,63 +516,31 @@ def email_score(inp: ScoreIn):
     trusted_sender = (domain in _trusted_domains() if domain else False) or _sender_looks_trusted(sender)
 
     # 1) Model probability
-    model_out = score_text(text)
-    prob = float(model_out.get("prob_phish", 0.0))
+    prob = float(score_text(text).get("prob_phish", 0.0))
 
-    # 2) Heuristics (trusted senders get lower score for "payment" etc.)
-    h_score, h_reasons, urls, domains = heuristic_score(subject, body, sender)
+    # 2) Heuristics
+    reply_to = (inp.reply_to or "").strip()
+    h_score, h_reasons, urls, domains = heuristic_score(subject, body, sender, reply_to)
 
-    # 3) Blend (trusted senders capped at Medium)
-    total, risk, model_pts = blend_model_with_heuristics(prob, h_score, trusted_sender=trusted_sender)
+    # 3) Blend
+    total, risk, _ = blend_model_with_heuristics(prob, h_score, trusted_sender=trusted_sender)
 
-    # 4) Optional OpenAI second opinion (when OPENAI_API_KEY is set and use_openai=True)
+    # 4) Optional OpenAI second opinion
     if getattr(inp, "use_openai", True):
-        try:
-            from sentinel.openai_check import openai_verdict
-            verdict = openai_verdict(subject, body, sender)
-            if verdict == "legit":
-                risk = "Low"
-                total = min(total, 3)
-            elif verdict == "phish" and risk == "Low":
-                risk = "Medium"
-                total = max(total, 4)
-        except Exception:
-            pass
+        risk, total = _apply_openai(subject, body, sender, risk, total)
 
-    # 5) Reasons / IoCs
-    reasons = []
-    if h_reasons:
-        reasons.extend(h_reasons)
-    reasons.append(f"Model probability={prob:.2f} (+{model_pts})")
-
-    # --- new return builder ---
-    clean_reasons = [r for r in reasons if "model probability" not in r.lower()]
-
-    def summarize(subject: str, body: str) -> str:
-        s = (subject or "").strip()
-        b = (body or "").strip().replace("\n", " ")
-        if len(b) > 140:
-            b = b[:140].rsplit(" ", 1)[0] + "…"
-        return f"{s} — {b}" if s and b else (s or b or "No content")
-
-    summary = summarize(subject, body)
-    prob = locals().get("prob", None)  # if you have prob, use it; else None
-    threat_pct = round((prob or (total/10)) * 100)
-
-    iocs = {
-        "urls": urls,
-        "domains": list(set(domains)),
-        "attachments": []
-    }
+    # 5) Build response
+    clean_reasons = [r for r in h_reasons if "model probability" not in r.lower()]
+    threat_pct = round((prob or (total / 10)) * 100)
 
     return {
-        "risk": risk,                   # "Low" | "Medium" | "High"
-        "score": total,                 # 0..10
-        "prob": prob,                   # optional
-        "threat_pct": threat_pct,       # 0..100
-        "summary": summary,             # <-- for the overlay to show
-        "reasons": clean_reasons[:3],   # top few, human-friendly
-        "iocs": iocs,                   # unchanged
+        "risk": risk,
+        "score": total,
+        "prob": prob,
+        "threat_pct": threat_pct,
+        "summary": _summarize(subject, body),
+        "reasons": clean_reasons[:3],
+        "iocs": {"urls": urls, "domains": list(set(domains)), "attachments": []},
     }
 
 class LogItem(BaseModel):
@@ -452,12 +573,48 @@ def logs_summary():
 def logs_all():
     return {"items": _read_logs()}
 
+
+# --- Feedback loop: user-marked safe emails ---
+FEEDBACK_PATH = os.path.join(os.path.dirname(__file__), "feedback_safe.json")
+
+class FeedbackItem(BaseModel):
+    subject: str = ""
+    sender: str = ""
+    body_preview: str = ""
+    risk_was: str = ""
+    prob_was: float = 0.0
+
+def _read_feedback():
+    if not os.path.exists(FEEDBACK_PATH):
+        return []
+    try:
+        return json.load(open(FEEDBACK_PATH, "r"))
+    except Exception:
+        return []
+
+@app.post("/feedback/safe")
+def feedback_safe(item: FeedbackItem):
+    """Store a user-marked false positive. Used for future hard negative mining."""
+    items = _read_feedback()
+    entry = item.dict()
+    entry["marked_at"] = time.time()
+    items.append(entry)
+    with open(FEEDBACK_PATH, "w") as f:
+        json.dump(items, f, indent=2)
+    return {"ok": True, "count": len(items)}
+
+@app.get("/feedback/safe")
+def feedback_safe_list():
+    """Return all user-marked safe emails."""
+    return {"items": _read_feedback()}
+
+
 reports = []  # temporary storage for results
 
 @app.post("/report")
 async def save_report(request: Request):
     data = await request.json()
-    data["timestamp"] = datetime.utcnow().isoformat()
+    data["timestamp"] = datetime.now(timezone.utc).isoformat()
     reports.append(data)
     print(f"✅ Received report: {data}")
     return {"status": "ok", "message": "Report stored!"}
