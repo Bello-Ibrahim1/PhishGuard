@@ -2,6 +2,55 @@
 
 PhishGuard scans your inbox for phishing and malicious emails using an AI model plus rule-based checks (wording + links/identifiers).
 
+**See [CHANGELOG.md](CHANGELOG.md)** for a description of what was changed and why (risk classification, trusted senders, OpenAI, extension UI, etc.).
+
+---
+
+## Quick start: run the extension (easy setup)
+
+Follow these steps to run the PhishGuard extension on Gmail. Everything runs from the **project root** (the folder that contains `sentinel/`, `extension/`, `ui/`).
+
+### Step 1: Get the project
+```bash
+git clone https://github.com/Bello-Ibrahim1/PhishGuard.git
+cd PhishGuard
+```
+(Or open the folder you already have.)
+
+### Step 2: Start the backend (required for the extension)
+```bash
+python3 -m venv venv
+source venv/bin/activate          # On Windows: venv\Scripts\activate
+pip install -r sentinel/requirements.txt
+./run_api.sh
+```
+Leave this terminal open. The API runs at `http://localhost:8000`. You need it running whenever you use the extension.
+
+**On Windows:** If `./run_api.sh` doesn’t work, run: `python -m uvicorn sentinel.main:app --reload --host 0.0.0.0 --port 8000` from the project root (with `venv` activated).
+
+### Step 3: Load the extension in Chrome
+1. Open Chrome and go to **chrome://extensions**
+2. Turn on **Developer mode** (top right)
+3. Click **Load unpacked**
+4. Select the **`extension`** folder inside the PhishGuard project
+5. The PhishGuard icon should appear in your toolbar
+
+### Step 4: Use it on Gmail
+1. Open [Gmail](https://mail.google.com) in the same browser
+2. Click the PhishGuard icon (or the extension popup) and choose **Open Panel**
+3. In the panel, click **Scan visible** to scan the emails on screen, or **Scan whole inbox** to scan more
+4. Each email gets a risk label (Low / Medium / High) and a short reason
+
+**Optional — dashboard:** To see a summary of all scanned emails (charts and table), in a **new terminal** run:
+```bash
+cd PhishGuard/ui
+npm install
+npm run dev
+```
+Then open the URL shown (e.g. `http://localhost:5173`) and click **View Full Report** in the extension panel to open it.
+
+**That’s it.** As long as the API is running (Step 2) and the extension is loaded (Step 3), you can scan Gmail from the panel.
+
 ---
 
 ## One branch, run from root (no switching)

@@ -1,12 +1,76 @@
-<!doctype html><html><head><meta charset="utf-8"><title>PhishGuard</title></head>
-<body style="font-family: Inter, Arial, sans-serif; padding: 8px; width: 320px; background: #020617; color: #e6eef7;">
-<h3 style="margin: 0 0 8px 0;">PhishGuard</h3>
-<button id="open" style="padding:8px 10px; border-radius:12px; border:1px solid #3b82f6; background:#3b82f6; color:white; cursor:pointer;">Open Panel</button>
-<script>
-  document.getElementById('open').addEventListener('click', async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    chrome.tabs.sendMessage(tab.id, { cmd: "open_panel" });
-    window.close();
-  });
-</script>
-</body></html>
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PhishGuard</title>
+<style>
+  :root{
+    --pg-bg:#05070d; --pg-text:#f1f5f9; --pg-text-sub:#8b96ab; --pg-text-strong:#c7cfdd;
+    --pg-border:rgba(255,255,255,.08); --pg-border-soft:rgba(255,255,255,.09);
+    --pg-wash-1:rgba(255,255,255,.03); --pg-wash-2:rgba(255,255,255,.05);
+    --pg-wash-3:rgba(255,255,255,.06); --pg-wash-4:rgba(255,255,255,.07);
+    --pg-danger-text:#fca5a5; --pg-danger-bg:rgba(248,113,113,.12); --pg-danger-border:rgba(248,113,113,.25);
+  }
+  /* Follows the OS/browser color scheme, same tokens and values as the in-page panel's
+     overlay.css — a popup that stayed dark-only while the panel and dashboard went
+     light/dark would read as three different products. */
+  @media (prefers-color-scheme: light){
+    :root{
+      --pg-bg:#f4f6fb; --pg-text:#0f172a; --pg-text-sub:#475569; --pg-text-strong:#1e293b;
+      --pg-border:rgba(15,23,42,.12); --pg-border-soft:rgba(15,23,42,.10);
+      --pg-wash-1:rgba(15,23,42,.035); --pg-wash-2:rgba(15,23,42,.05);
+      --pg-wash-3:rgba(15,23,42,.06); --pg-wash-4:rgba(15,23,42,.08);
+      --pg-danger-text:#b91c1c; --pg-danger-bg:rgba(185,28,28,.10); --pg-danger-border:rgba(185,28,28,.22);
+    }
+  }
+  *{box-sizing:border-box}
+  body{
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    margin:0;width:300px;background:var(--pg-bg);color:var(--pg-text);
+  }
+  .pop-header{padding:18px 18px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--pg-border-soft)}
+  .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6,#22d3ee);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px -4px rgba(99,102,241,.6)}
+  .logo svg{width:19px;height:19px}
+  .pop-header .t{font-weight:800;font-size:15px;letter-spacing:-.01em}
+  .pop-header .s{font-size:11px;color:var(--pg-text-sub);margin-top:1px}
+  .pop-body{padding:16px 18px 18px}
+  .open-btn{
+    width:100%;padding:11px;border-radius:12px;border:none;cursor:pointer;
+    background:linear-gradient(135deg,#6366f1,#8b5cf6,#22d3ee);color:#fff;font-weight:700;font-size:13px;
+    box-shadow:0 8px 20px -6px rgba(99,102,241,.55);transition:transform .15s;
+  }
+  .open-btn:hover{transform:translateY(-1px)}
+  .links{display:flex;gap:8px;margin-top:10px}
+  .link-btn{
+    flex:1;text-align:center;padding:9px;border-radius:10px;border:1px solid var(--pg-border);
+    background:var(--pg-wash-1);color:var(--pg-text-strong);font-size:11.5px;font-weight:600;cursor:pointer;text-decoration:none;
+  }
+  .link-btn:hover{background:var(--pg-wash-4);color:var(--pg-text)}
+  .sites{margin-top:14px;display:flex;gap:6px;flex-wrap:wrap}
+  .site-chip{font-size:10px;padding:3px 8px;border-radius:999px;background:var(--pg-wash-2);color:var(--pg-text-sub);border:1px solid var(--pg-wash-3)}
+  #pop-notice{margin-top:10px;padding:9px 10px;border-radius:10px;background:var(--pg-danger-bg);border:1px solid var(--pg-danger-border);color:var(--pg-danger-text);font-size:11px;line-height:1.5}
+</style>
+</head>
+<body>
+  <div class="pop-header">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5v6c0 5.2 3.4 9.7 8 11 4.6-1.3 8-5.8 8-11V5l-8-3z" fill="#fff"/><path d="M9 12.5l2 2 4-4.5" stroke="#4338ca" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div>
+      <div class="t">PhishGuard</div>
+      <div class="s">AI phishing protection</div>
+    </div>
+  </div>
+  <div class="pop-body">
+    <button id="open" class="open-btn">Open panel on this page</button>
+    <div class="links">
+      <a class="link-btn" id="options" href="#">Settings</a>
+      <a class="link-btn" id="report" href="#">Full report</a>
+    </div>
+    <div class="sites">
+      <span class="site-chip">Gmail</span>
+      <span class="site-chip">Outlook Web</span>
+      <span class="site-chip">Yahoo Mail</span>
+    </div>
+  </div>
+<script src="popup.js"></script>
+</body>
+</html>

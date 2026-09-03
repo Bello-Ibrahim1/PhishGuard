@@ -7,6 +7,13 @@ export type Report = {
   risk: "Low" | "Medium" | "High";
   reasons?: string[];
   timestamp?: string;
+  /** Deep link straight to the real email in Gmail — only set when the extension could
+   *  derive a real Gmail API message id (see gmail_link in panel.js's /ingest/report call).
+   *  Undefined for Outlook/Yahoo reports, or Gmail rows Google didn't expose an id for. */
+  gmailLink?: string;
+  /** Which inbox this was scanned from — "Gmail" | "Outlook" | "Yahoo Mail" | "Unknown"
+   *  (older reports ingested before this field existed have none). */
+  source?: string;
 };
 
 /** Dashboard data comes from the same place as the extension: /ingest/report → REPORTS */
@@ -24,9 +31,15 @@ export async function fetchSummary(): Promise<Summary> {
   };
 }
 
+// 20000 comfortably covers a full inbox scan (the backend itself now keeps up to
+// 50000 reports — see REPORTS in sentinel/main.py — this was previously capped at
+// 500 here on top of the backend's old 1000-item cap, silently truncating anything
+// scanned past the first 500-1000 emails).
+const RECENT_LIMIT = 20000;
+
 /** Recent reports from extension scans (same list as /reports/summary) */
 export async function fetchReports(): Promise<Report[]> {
-  const r = await fetch(`${API_BASE}/reports/recent?limit=500`);
+  const r = await fetch(`${API_BASE}/reports/recent?limit=${RECENT_LIMIT}`);
   if (!r.ok) throw new Error(`reports failed ${r.status}`);
   const list = await r.json();
   if (!Array.isArray(list)) return [];
@@ -36,5 +49,7 @@ export async function fetchReports(): Promise<Report[]> {
     sender: typeof item.sender === "string" ? item.sender : undefined,
     email_subject: typeof item.subject === "string" ? item.subject : undefined,
     reasons: Array.isArray(item.reasons) ? (item.reasons as string[]) : undefined,
+    gmailLink: typeof item.gmail_link === "string" ? item.gmail_link : undefined,
+    source: typeof item.source === "string" ? item.source : undefined,
   }));
 }

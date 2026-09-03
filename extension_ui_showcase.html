@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhishGuard v2 — UI Redesign Showcase</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#0b0f1a;color:#e2e8f0;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+.showcase-hdr{max-width:1000px;margin:0 auto;padding:36px 24px 20px}
+.showcase-hdr h1{font-size:24px;margin:0 0 8px}
+.showcase-hdr p{color:#94a3b8;font-size:14px;line-height:1.6;max-width:680px}
+.tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:rgba(99,102,241,.15);color:#a5b4fc;border:1px solid rgba(99,102,241,.3);margin-bottom:12px}
+.site-tabs{max-width:1000px;margin:0 auto;padding:0 24px;display:flex;gap:8px}
+.site-tab{padding:8px 16px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:#94a3b8;font-size:12.5px;font-weight:700;cursor:pointer}
+.site-tab.active{background:#6366f1;border-color:#6366f1;color:#fff}
+.mock-inbox-wrap{max-width:1000px;margin:18px auto 60px;padding:0 24px}
+.mock-inbox{
+  position:relative;height:600px;border-radius:20px;overflow:hidden;
+  background:linear-gradient(160deg,#fafbfc 0%,#f1f3f6 100%);border:1px solid rgba(255,255,255,.08);
+  box-shadow:0 30px 70px -20px rgba(0,0,0,.6);
+}
+.mock-toolbar{height:52px;background:#fff;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;padding:0 20px;gap:14px}
+.mock-toolbar .dots{display:flex;gap:6px}
+.mock-toolbar .dots span{width:11px;height:11px;border-radius:50%}
+.mock-toolbar .search{flex:1;height:30px;background:#f1f3f6;border-radius:8px;margin-left:20px}
+.mock-row{display:flex;align-items:center;gap:14px;padding:13px 20px;border-bottom:1px solid #f1f3f6;color:#1f2937}
+.mock-row .from{width:150px;font-size:13px;font-weight:600;flex-shrink:0}
+.mock-row .subj{width:230px;font-size:13px;font-weight:600;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mock-row .prev{font-size:13px;color:#9ca3af;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pg-root{position:absolute;inset:0;pointer-events:none}
+#pg-root #phishguard-launcher, #pg-root #phishguard-panel{pointer-events:auto}
+.callouts{max-width:1000px;margin:0 auto 60px;padding:0 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.callout{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px}
+.callout .n{font-size:11px;font-weight:800;color:#a5b4fc;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.callout .d{font-size:12.5px;color:#94a3b8;line-height:1.55}
+/* PhishGuard — refined dark-glass design system (v2) */
+:root{
+  --pg-bg:#05070d;
+  --pg-panel:rgba(9,12,22,.74);
+  --pg-panel-solid:#0a0e1a;
+  --pg-border:rgba(255,255,255,.09);
+  --pg-border-soft:rgba(255,255,255,.05);
+  --pg-text:#f1f5f9;
+  --pg-text-sub:#8b96ab;
+  --pg-text-faint:#5b6579;
+  --pg-accent-1:#6366f1;
+  --pg-accent-2:#22d3ee;
+  --pg-accent-grad:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#22d3ee 100%);
+  --pg-safe:#34d399;
+  --pg-safe-bg:rgba(52,211,153,.14);
+  --pg-warn:#fbbf24;
+  --pg-warn-bg:rgba(251,191,36,.14);
+  --pg-danger:#f87171;
+  --pg-danger-bg:rgba(248,113,113,.16);
+  --pg-r-sm:10px;
+  --pg-r-md:14px;
+  --pg-r-lg:20px;
+  --pg-r-xl:26px;
+  --pg-shadow:0 24px 60px -12px rgba(0,0,0,.55), 0 4px 16px rgba(0,0,0,.35);
+  --pg-font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+}
+
+#phishguard-launcher{
+  position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;
+  background:var(--pg-accent-grad);border:none;cursor:pointer;z-index:2147483646;
+  box-shadow:0 10px 30px -6px rgba(99,102,241,.55), 0 2px 8px rgba(0,0,0,.4);
+  display:flex;align-items:center;justify-content:center;transition:transform .18s ease, box-shadow .18s ease;
+}
+#phishguard-launcher:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 14px 36px -6px rgba(99,102,241,.7), 0 4px 10px rgba(0,0,0,.45)}
+#phishguard-launcher svg{width:26px;height:26px}
+#phishguard-launcher .pg-launcher-badge{
+  position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;
+  background:var(--pg-danger);color:#fff;font:800 10px/18px var(--pg-font);text-align:center;
+  border:2px solid var(--pg-bg);display:none;
+}
+#phishguard-launcher .pg-launcher-badge.show{display:block}
+
+#phishguard-panel{
+  position:fixed;right:20px;bottom:20px;width:384px;height:560px;
+  min-width:320px;min-height:340px;
+  background:var(--pg-panel);color:var(--pg-text);
+  backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);
+  border:1px solid var(--pg-border);border-radius:var(--pg-r-xl);box-shadow:var(--pg-shadow);
+  font-family:var(--pg-font);z-index:2147483647;display:flex;flex-direction:column;overflow:hidden;
+  animation:pg-panel-in .28s cubic-bezier(.16,1,.3,1);
+}
+#phishguard-panel[hidden]{display:none}
+#phishguard-panel.pg-resizing{animation:none;transition:none !important;user-select:none}
+#phishguard-panel.pg-resizing #phishguard-results{pointer-events:none}
+@keyframes pg-panel-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+
+.pg-resize-handle{
+  position:absolute;top:0;left:0;width:20px;height:20px;cursor:nwse-resize;z-index:20;
+  display:flex;align-items:center;justify-content:center;border-top-left-radius:var(--pg-r-xl);
+}
+.pg-resize-handle svg{width:9px;height:9px;opacity:.3;transition:opacity .15s}
+.pg-resize-handle:hover svg,.pg-resize-handle:active svg{opacity:.85}
+.pg-size-btn{
+  width:24px;height:24px;border-radius:8px;border:1px solid transparent;background:transparent;
+  color:var(--pg-text-sub);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;
+}
+.pg-size-btn:hover{background:rgba(255,255,255,.06);color:var(--pg-text)}
+.pg-size-btn svg{width:14px;height:14px}
+
+#phishguard-header{
+  display:flex;align-items:center;gap:10px;padding:16px 16px 14px;
+  border-bottom:1px solid var(--pg-border-soft);background:linear-gradient(180deg,rgba(99,102,241,.10),transparent);
+  position:relative;
+}
+.pg-logo-mark{
+  width:32px;height:32px;border-radius:10px;background:var(--pg-accent-grad);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 4px 14px -4px rgba(99,102,241,.6);
+}
+.pg-logo-mark svg{width:18px;height:18px}
+#phishguard-header .pg-titles{flex:1;min-width:0}
+#phishguard-header .title{font-weight:800;font-size:14.5px;letter-spacing:-.01em;line-height:1.2}
+#phishguard-header .pg-status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--pg-text-sub);margin-top:2px}
+#phishguard-header .pg-status .dot{width:6px;height:6px;border-radius:50%;background:var(--pg-safe);box-shadow:0 0 0 3px var(--pg-safe-bg);animation:pg-pulse 2.4s ease-in-out infinite}
+@keyframes pg-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+#pg-close{
+  width:28px;height:28px;border-radius:9px;border:1px solid transparent;background:transparent;
+  color:var(--pg-text-sub);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;
+}
+#pg-close:hover{background:rgba(255,255,255,.06);color:var(--pg-text)}
+
+#phishguard-actions{padding:12px 16px;border-bottom:1px solid var(--pg-border-soft);display:flex;flex-direction:column;gap:8px}
+.pg-segmented{display:flex;background:rgba(255,255,255,.04);border:1px solid var(--pg-border-soft);border-radius:var(--pg-r-md);padding:3px;gap:3px}
+.pg-seg-btn{
+  flex:1;padding:8px 10px;border-radius:10px;border:none;background:transparent;color:var(--pg-text-sub);
+  font:700 12.5px/1 var(--pg-font);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.pg-seg-btn svg{width:14px;height:14px;opacity:.85}
+.pg-seg-btn:hover{color:var(--pg-text)}
+.pg-seg-btn.active{background:var(--pg-panel-solid);color:var(--pg-text);box-shadow:0 2px 8px rgba(0,0,0,.35), inset 0 0 0 1px var(--pg-border)}
+.pg-row-actions{display:flex;gap:6px}
+.pg-btn{
+  padding:7px 12px;border-radius:9px;border:1px solid var(--pg-border);background:rgba(255,255,255,.03);
+  color:var(--pg-text-sub);font:600 11.5px/1 var(--pg-font);cursor:pointer;transition:.15s;
+}
+.pg-btn:hover{background:rgba(255,255,255,.07);color:var(--pg-text);border-color:rgba(255,255,255,.16)}
+.pg-btn.danger:hover{color:var(--pg-danger);border-color:rgba(248,113,113,.35)}
+
+#phishguard-results{overflow-y:auto;padding:12px 14px;flex:1;min-height:80px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.15) transparent}
+#phishguard-results::-webkit-scrollbar{width:6px}
+#phishguard-results::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:99px}
+.pg-empty{padding:32px 12px;text-align:center;color:var(--pg-text-faint);font-size:13px;line-height:1.6}
+.pg-empty svg{width:34px;height:34px;opacity:.35;margin-bottom:8px}
+
+.pg-card{
+  background:rgba(255,255,255,.03);border:1px solid var(--pg-border-soft);border-radius:var(--pg-r-md);
+  padding:12px 13px;margin-bottom:8px;cursor:pointer;transition:background .15s,border-color .15s,transform .15s;
+  animation:pg-card-in .32s cubic-bezier(.16,1,.3,1) backwards;
+}
+.pg-card:hover{background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.14)}
+.pg-card:active{transform:scale(.995)}
+@keyframes pg-card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.pg-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.pg-left{display:flex;gap:10px;min-width:0;flex:1}
+.pg-avatar{
+  width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font:800 12px var(--pg-font);color:#fff;background:var(--pg-accent-grad);
+}
+.pg-text{min-width:0;flex:1}
+.pg-title{font-weight:700;font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-sub{opacity:.7;font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-summary{margin-top:5px;font-size:12px;line-height:1.45;color:var(--pg-text-sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pg-right{display:flex;align-items:flex-start;flex-shrink:0}
+.pg-pill{
+  display:flex;align-items:center;gap:4px;padding:4px 9px 4px 7px;border-radius:999px;
+  font:800 10.5px/1 var(--pg-font);letter-spacing:.02em;white-space:nowrap;
+}
+.pg-pill svg{width:11px;height:11px}
+.pg-pill.low{background:var(--pg-safe-bg);color:var(--pg-safe)}
+.pg-pill.medium{background:var(--pg-warn-bg);color:var(--pg-warn)}
+.pg-pill.high{background:var(--pg-danger-bg);color:var(--pg-danger)}
+
+.pg-meter-track{margin-top:10px;height:4px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden}
+.pg-meter-fill{height:100%;border-radius:99px;transition:width .5s cubic-bezier(.16,1,.3,1)}
+.pg-meter-fill.low{background:var(--pg-safe)}
+.pg-meter-fill.medium{background:var(--pg-warn)}
+.pg-meter-fill.high{background:var(--pg-danger)}
+
+.pg-reasons{margin-top:9px;display:none;flex-wrap:wrap;gap:5px}
+.pg-card.expanded .pg-reasons{display:flex}
+.pg-chip{padding:3px 8px;border-radius:7px;background:rgba(255,255,255,.05);border:1px solid var(--pg-border-soft);font-size:10.5px;color:var(--pg-text-sub);line-height:1.4}
+.pg-meta-row{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:10.5px;color:var(--pg-text-faint)}
+.pg-expand-hint{display:flex;align-items:center;gap:3px}
+.pg-expand-hint svg{width:10px;height:10px;transition:transform .2s}
+.pg-card.expanded .pg-expand-hint svg{transform:rotate(180deg)}
+
+.pg-err{color:var(--pg-danger);font-size:12px;padding:10px;background:var(--pg-danger-bg);border-radius:var(--pg-r-sm)}
+
+#phishguard-footer{
+  display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--pg-border-soft);
+  background:rgba(0,0,0,.15);font-size:11px;color:var(--pg-text-sub);
+}
+#pg-count{white-space:nowrap;font-weight:600}
+.pg-progress{height:5px;background:rgba(255,255,255,.07);border-radius:99px;overflow:hidden;flex:1}
+.pg-bar{height:100%;width:0%;background:var(--pg-accent-grad);transition:width .3s ease;border-radius:99px}
+.pg-powered{font-size:9.5px;color:var(--pg-text-faint);white-space:nowrap;letter-spacing:.02em}
+
+</style>
+</head>
+<body>
+<div class="showcase-hdr">
+  <div class="tag">v0.4 redesign</div>
+  <h1>PhishGuard — refined dark-glass UI</h1>
+  <p>This is the real <code>panel.js</code> + <code>overlay.css</code> from the extension, running against a mock inbox — not a static image. Click a card to expand its reasons, click the floating logo to open/close the panel, <b>drag the top-left corner of the panel to resize it</b> (or use the resize-cycle icon in the header), and try the segmented control.</p>
+</div>
+<div class="site-tabs">
+  <button class="site-tab active" data-site="Gmail">Gmail</button>
+  <button class="site-tab" data-site="Outlook">Outlook Web</button>
+  <button class="site-tab" data-site="Yahoo Mail">Yahoo Mail</button>
+</div>
+<div class="mock-inbox-wrap">
+  <div class="mock-inbox">
+    <div class="mock-toolbar">
+      <div class="dots"><span style="background:#ff5f57"></span><span style="background:#febc2e"></span><span style="background:#28c840"></span></div>
+      <div class="search"></div>
+    </div>
+    <div class="mock-rows">
+      <div class="mock-row"><span class="from">PayPal Support</span><span class="subj">Your account has been suspended</span><span class="prev">Dear Customer, we detected unusual activity...</span></div>
+      <div class="mock-row"><span class="from">Netflix</span><span class="subj">Your payment was declined</span><span class="prev">We were unable to charge your card on file...</span></div>
+      <div class="mock-row"><span class="from">Sarah Johnson</span><span class="subj">Notes from today's standup</span><span class="prev">Quick recap of standup: engineering is on track...</span></div>
+      <div class="mock-row"><span class="from">Chase</span><span class="subj">Your November statement is ready</span><span class="prev">Your statement for account ending in 4821...</span></div>
+      <div class="mock-row"><span class="from">Unknown</span><span class="subj">CONGRATULATIONS! You've won $2,500,000</span><span class="prev">Dear beneficiary, you have won the lottery...</span></div>
+      <div class="mock-row"><span class="from">Delta Air Lines</span><span class="subj">Check-in now open for your flight</span><span class="prev">Check-in is now open for your upcoming flight...</span></div>
+    </div>
+    <div id="pg-root"></div>
+  </div>
+</div>
+<div class="callouts">
+  <div class="callout"><div class="n">Resizable, no longer fixed</div><div class="d">Drag the top-left corner to any size between roughly 320×340 and 680×860px, or click the size-cycle icon for Compact/Default/Large presets. Your size is remembered next time.</div></div>
+  <div class="callout"><div class="n">Expandable evidence</div><div class="d">Cards show a risk pill and threat meter at a glance; click to expand the exact reasons PhishGuard flagged it.</div></div>
+  <div class="callout"><div class="n">One codebase, three inboxes</div><div class="d">The same panel now runs on Gmail, Outlook on the web, and Yahoo Mail via swappable site adapters.</div></div>
+</div>
+
+<script>
+// ---- mock chrome + fetch so the real panel.js runs standalone here ----
+window.chrome = {
+  storage: { sync: { get: (d, cb) => cb(d), set: () => {} } },
+  runtime: { getURL: () => "", onMessage: { addListener: () => {} } },
+};
+const SAMPLE = [
+  {subject:"Your account has been suspended", sender:"PayPal Support <support@paypal-verify-account.tk>", snippet:"Dear Customer, we detected unusual activity on your account.", risk:"High", pct:100, reasons:["Sender impersonates Paypal (domain does not match)","Phishing wording: «suspended»","Phishing wording: «verify your identity»"]},
+  {subject:"Your payment was declined", sender:"Netflix <billing@netflix-account-update.com>", snippet:"We were unable to charge your card on file.", risk:"High", pct:99, reasons:["Sender impersonates Netflix (domain does not match)"]},
+  {subject:"Notes from today's standup", sender:"Sarah Johnson <sarah.johnson@ourcompany.com>", snippet:"Quick recap of standup: engineering is on track for Friday.", risk:"Low", pct:0, reasons:[]},
+  {subject:"Your November statement is ready", sender:"Chase <no.reply.alerts@chase.com>", snippet:"Your statement for account ending in 4821 is now available.", risk:"Low", pct:6, reasons:["Trusted domain (chase.com)"]},
+  {subject:"CONGRATULATIONS! You've won $2,500,000", sender:"Unknown <winner@lottery-intl.click>", snippet:"Dear beneficiary, you have won the international lottery.", risk:"High", pct:100, reasons:["Phishing wording: «congratulations you»","Phishing wording: «claim your prize»"]},
+  {subject:"Check-in now open for your flight", sender:"Delta Air Lines <no.reply@delta.com>", snippet:"Check-in is now open for your upcoming flight.", risk:"Medium", pct:22, reasons:["Trusted domain (delta.com)"]},
+];
+let i = 0;
+window.fetch = async (url) => {
+  if (url.endsWith("/email/score")) {
+    const item = SAMPLE[i++ % SAMPLE.length];
+    return { ok: true, json: async () => ({ risk: item.risk, threat_pct: item.pct, summary: item.subject + " — " + item.snippet, reasons: item.reasons }) };
+  }
+  return { ok: true, json: async () => ({ ok: true }) };
+};
+let currentSite = "Gmail";
+window.PhishGuardAdapter = {
+  get siteName() { return currentSite; },
+  experimental: false,
+  extractVisibleEmails: () => SAMPLE.map((s, idx) => ({ id: String(idx), subject: s.subject, sender: s.sender, snippet: s.snippet })),
+  collectAllInbox: async () => [],
+};
+
+// PhishGuard — shared panel UI + scan orchestration (v2 design)
+// Requires window.PhishGuardAdapter to be set by a site adapter script loaded first.
+(function () {
+  const ICONS = {
+    logo: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5v6c0 5.2 3.4 9.7 8 11 4.6-1.3 8-5.8 8-11V5l-8-3z" fill="#fff" fill-opacity=".95"/><path d="M9 12.5l2 2 4-4.5" stroke="#4338ca" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    close: `<svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+    scanVisible: `<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 9h18" stroke="currentColor" stroke-width="1.8"/></svg>`,
+    scanAll: `<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+    chevron: `<svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    empty: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5v6c0 5.2 3.4 9.7 8 11 4.6-1.3 8-5.8 8-11V5l-8-3z" stroke="currentColor" stroke-width="1.5"/></svg>`,
+    low: `<svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    medium: `<svg viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M10.3 3.9L2.6 18a1.5 1.5 0 001.3 2.2h16.2a1.5 1.5 0 001.3-2.2L13.7 3.9a1.5 1.5 0 00-2.6 0z" stroke="currentColor" stroke-width="1.6"/></svg>`,
+    high: `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 7v6M12 16.5h.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>`,
+    resize: `<svg viewBox="0 0 24 24" fill="none"><path d="M21 3L14 10M21 10L13 18M21 17L18 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+    sizeCycle: `<svg viewBox="0 0 24 24" fill="none"><path d="M4 14v6h6M20 10V4h-6M20 4l-7 7M4 20l7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  };
+
+  function esc(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function initials(sender) {
+    const name = (sender || '').replace(/<.*?>/g, '').trim();
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    return (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase();
+  }
+  function riskClass(risk) { return risk === 'High' ? 'high' : risk === 'Medium' ? 'medium' : 'low'; }
+
+  // ---------- Resizable panel ----------
+  const SIZE_PRESETS = [
+    { w: 340, h: 420, label: 'Compact' },
+    { w: 384, h: 560, label: 'Default' },
+    { w: 480, h: 700, label: 'Large' },
+  ];
+  const MIN_W = 320, MIN_H = 340;
+  function maxW() { return Math.min(680, window.innerWidth - 40); }
+  function maxH() { return Math.min(860, window.innerHeight - 40); }
+  function clampSize(w, h) {
+    return { w: Math.round(Math.min(maxW(), Math.max(MIN_W, w))), h: Math.round(Math.min(maxH(), Math.max(MIN_H, h))) };
+  }
+  function applySize(panel, w, h) {
+    const c = clampSize(w, h);
+    panel.style.width = c.w + 'px';
+    panel.style.height = c.h + 'px';
+    return c;
+  }
+  function saveSize(w, h) { chrome.storage.sync.set({ panelSize: { w, h } }); }
+  function getSavedSize() { return new Promise(r => chrome.storage.sync.get({ panelSize: null }, o => r(o.panelSize))); }
+
+  function setupResize(panel, handle, sizeCycleBtn) {
+    let dragging = false, startX = 0, startY = 0, startW = 0, startH = 0;
+    handle.addEventListener('pointerdown', (e) => {
+      dragging = true;
+      startX = e.clientX; startY = e.clientY;
+      startW = panel.offsetWidth; startH = panel.offsetHeight;
+      panel.classList.add('pg-resizing');
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {} // not all environments support pointer capture
+      e.preventDefault();
+    });
+    handle.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      const dx = startX - e.clientX; // dragging left (handle is top-left) grows the panel
+      const dy = startY - e.clientY; // dragging up grows the panel
+      applySize(panel, startW + dx, startH + dy);
+    });
+    function endDrag(e) {
+      if (!dragging) return;
+      dragging = false;
+      panel.classList.remove('pg-resizing');
+      saveSize(panel.offsetWidth, panel.offsetHeight);
+    }
+    handle.addEventListener('pointerup', endDrag);
+    handle.addEventListener('pointercancel', endDrag);
+    handle.addEventListener('dblclick', () => {
+      const c = applySize(panel, SIZE_PRESETS[1].w, SIZE_PRESETS[1].h);
+      saveSize(c.w, c.h);
+    });
+
+    if (sizeCycleBtn) {
+      let presetIdx = 1;
+      sizeCycleBtn.title = 'Cycle size: Compact / Default / Large';
+      sizeCycleBtn.addEventListener('click', () => {
+        presetIdx = (presetIdx + 1) % SIZE_PRESETS.length;
+        const p = SIZE_PRESETS[presetIdx];
+        const c = applySize(panel, p.w, p.h);
+        saveSize(c.w, c.h);
+      });
+    }
+  }
+
+  async function restoreSize(panel) {
+    const saved = await getSavedSize();
+    if (saved && saved.w && saved.h) applySize(panel, saved.w, saved.h);
+  }
+
+  const DEFAULT_API = "http://localhost:8000";
+  const DEFAULT_DASHBOARD = "http://localhost:5173";
+  function getApiBase() { return new Promise(r => { chrome.storage.sync.get({ apiBase: DEFAULT_API }, o => r(o.apiBase || DEFAULT_API)); }); }
+  function getDashboardUrl() { return new Promise(r => { chrome.storage.sync.get({ dashboardUrl: DEFAULT_DASHBOARD }, o => r(o.dashboardUrl || DEFAULT_DASHBOARD)); }); }
+
+  let abortScan = null;
+  let panelOpen = false;
+
+  function ensureLauncher() {
+    if (document.getElementById('phishguard-launcher')) return;
+    const btn = document.createElement('button');
+    btn.id = 'phishguard-launcher';
+    btn.title = 'Open PhishGuard';
+    btn.innerHTML = `${ICONS.logo}<span class="pg-launcher-badge" id="pg-launcher-badge">0</span>`;
+    btn.onclick = () => togglePanel();
+    document.body.appendChild(btn);
+  }
+
+  function ensurePanel() {
+    if (document.getElementById('phishguard-panel')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('overlay.css');
+    document.documentElement.appendChild(link);
+
+    const siteName = (window.PhishGuardAdapter && window.PhishGuardAdapter.siteName) || 'this inbox';
+    const panel = document.createElement('div');
+    panel.id = 'phishguard-panel';
+    panel.hidden = true;
+    panel.innerHTML = `
+      <div class="pg-resize-handle" id="pg-resize-handle" title="Drag to resize \u00b7 double-click to reset">${ICONS.resize}</div>
+      <div id="phishguard-header">
+        <div class="pg-logo-mark">${ICONS.logo}</div>
+        <div class="pg-titles">
+          <div class="title">PhishGuard</div>
+          <div class="pg-status"><span class="dot"></span>Protecting ${esc(siteName)}</div>
+        </div>
+        <button class="pg-size-btn" id="pg-size-cycle" title="Cycle panel size">${ICONS.sizeCycle}</button>
+        <button id="pg-close" title="Close">${ICONS.close}</button>
+      </div>
+      <div id="phishguard-actions">
+        <div class="pg-segmented">
+          <button class="pg-seg-btn active" id="pg-scan-visible">${ICONS.scanVisible}Scan visible</button>
+          <button class="pg-seg-btn" id="pg-scan-all">${ICONS.scanAll}Scan inbox</button>
+        </div>
+        <div class="pg-row-actions">
+          <button class="pg-btn" id="pg-report">Full report</button>
+          <button class="pg-btn" id="pg-clear">Clear</button>
+          <button class="pg-btn danger" id="pg-cancel">Cancel</button>
+        </div>
+      </div>
+      <div id="phishguard-results"><div class="pg-empty">${ICONS.empty}<div>No scans yet. Click <b>Scan visible</b> to check the emails on screen.</div></div></div>
+      <div id="phishguard-footer">
+        <span id="pg-count">0 emails</span>
+        <div class="pg-progress"><div class="pg-bar" id="pg-bar"></div></div>
+        <span class="pg-powered">AI + heuristics</span>
+      </div>`;
+    document.body.appendChild(panel);
+
+    setupResize(panel, document.getElementById('pg-resize-handle'), document.getElementById('pg-size-cycle'));
+    restoreSize(panel);
+    document.getElementById('pg-close').onclick = () => togglePanel(false);
+    document.getElementById('pg-scan-visible').onclick = () => runScan(false);
+    document.getElementById('pg-scan-all').onclick = () => runScan(true);
+    document.getElementById('pg-cancel').onclick = () => { if (abortScan) abortScan(); };
+    document.getElementById('pg-clear').onclick = () => {
+      document.getElementById('phishguard-results').innerHTML = `<div class="pg-empty">${ICONS.empty}<div>No scans yet. Click <b>Scan visible</b> to check the emails on screen.</div></div>`;
+      updateBar(0, 1); setCount(0); setBadge(0);
+    };
+    document.getElementById('pg-report').onclick = () => { getDashboardUrl().then(url => window.open(url, '_blank')); };
+  }
+
+  function togglePanel(force) {
+    ensurePanel();
+    const panel = document.getElementById('phishguard-panel');
+    panelOpen = typeof force === 'boolean' ? force : !panelOpen;
+    panel.hidden = !panelOpen;
+  }
+
+  function setCount(n) { const el = document.getElementById('pg-count'); if (el) el.textContent = `${n} email${n === 1 ? '' : 's'}`; }
+  function updateBar(done, total) { const el = document.getElementById('pg-bar'); if (el) el.style.width = (total ? Math.min(100, Math.round(done * 100 / total)) : 0) + '%'; }
+  function setBadge(highCount) {
+    const b = document.getElementById('pg-launcher-badge');
+    if (!b) return;
+    if (highCount > 0) { b.textContent = highCount > 9 ? '9+' : String(highCount); b.classList.add('show'); }
+    else { b.classList.remove('show'); }
+  }
+
+  let highCount = 0;
+
+  function buildCard(meta, api) {
+    const risk = api?.risk || 'Low';
+    const cls = riskClass(risk);
+    const pct = (typeof api?.threat_pct === 'number') ? api.threat_pct : Math.round((api?.prob || 0) * 100);
+    const summary = api?.summary || (meta?.subject ? `${meta.subject} — ${meta.snippet || ''}` : (meta?.snippet || 'No content'));
+    const reasons = (api?.reasons || []).filter(Boolean);
+
+    const el = document.createElement('div');
+    el.className = 'pg-card';
+    el.innerHTML = `
+      <div class="pg-row">
+        <div class="pg-left">
+          <div class="pg-avatar">${esc(initials(meta?.sender))}</div>
+          <div class="pg-text">
+            <div class="pg-title">${esc(meta?.subject || '(no subject)')}</div>
+            <div class="pg-sub">${esc(meta?.sender || '')}</div>
+            <div class="pg-summary">${esc(summary)}</div>
+          </div>
+        </div>
+        <div class="pg-right"><span class="pg-pill ${cls}">${ICONS[cls]}${esc(risk)}</span></div>
+      </div>
+      <div class="pg-meter-track"><div class="pg-meter-fill ${cls}" style="width:${pct}%"></div></div>
+      ${reasons.length ? `<div class="pg-reasons">${reasons.map(r => `<span class="pg-chip">${esc(r)}</span>`).join('')}</div>` : ''}
+      <div class="pg-meta-row">
+        <span>Threat likelihood: <b style="color:var(--pg-text)">${pct}%</b></span>
+        ${reasons.length ? `<span class="pg-expand-hint">Details ${ICONS.chevron}</span>` : ''}
+      </div>`;
+    if (reasons.length) el.addEventListener('click', () => el.classList.toggle('expanded'));
+    if (risk === 'High') highCount++;
+    return el;
+  }
+
+  async function scoreOneEmail(msg) {
+    const base = await getApiBase();
+    const res = await fetch(base + '/email/score', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: msg.subject || '', body: msg.body || msg.snippet || '', sender: msg.sender || '' }),
+    });
+    if (!res.ok) throw new Error('API error: ' + res.status);
+    return res.json();
+  }
+
+  async function renderCard(container, msg) {
+    try {
+      const api = await scoreOneEmail(msg);
+      const node = buildCard({ subject: msg.subject, sender: msg.sender, snippet: msg.snippet || '' }, api);
+      container.appendChild(node);
+      setBadge(highCount);
+      try {
+        const base = await getApiBase();
+        await fetch(base + '/ingest/report', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ time: new Date().toISOString(), risk: api.risk, sender: msg.sender, subject: msg.subject, body_preview: api.summary, reasons: api.reasons || [] }),
+        });
+      } catch (_) {}
+    } catch (e) {
+      const err = document.createElement('div');
+      err.className = 'pg-err';
+      err.textContent = 'Couldn’t reach PhishGuard API — ' + e.message + '. Check the API URL in options.';
+      container.appendChild(err);
+    }
+  }
+
+  async function runScan(full) {
+    togglePanel(true);
+    const box = document.getElementById('phishguard-results');
+    box.innerHTML = '';
+    highCount = 0;
+    const adapter = window.PhishGuardAdapter;
+    if (!adapter) {
+      box.innerHTML = `<div class="pg-err">No adapter loaded for this site.</div>`;
+      return;
+    }
+    let emails = [];
+    if (full) {
+      box.innerHTML = `<div class="pg-empty">Scrolling and scanning the inbox…</div>`;
+      emails = await adapter.collectAllInbox(1000, n => setCount(n));
+    } else {
+      emails = adapter.extractVisibleEmails();
+      setCount(emails.length);
+    }
+    box.innerHTML = '';
+    document.getElementById('pg-scan-visible').classList.toggle('active', !full);
+    document.getElementById('pg-scan-all').classList.toggle('active', full);
+    if (!emails.length) {
+      box.innerHTML = `<div class="pg-empty">${ICONS.empty}<div>No emails detected on screen. ${adapter.experimental ? 'This site’s support is experimental — layout may have changed.' : 'Try scrolling the inbox into view.'}</div></div>`;
+      updateBar(0, 1);
+      return;
+    }
+    const batchSize = 10;
+    let i = 0, cancelled = false;
+    abortScan = () => { cancelled = true; };
+    while (i < emails.length && !cancelled) {
+      const slice = emails.slice(i, i + batchSize);
+      await Promise.all(slice.map(e => renderCard(box, e)));
+      i += batchSize;
+      updateBar(i, emails.length);
+    }
+    abortScan = null;
+  }
+
+  ensureLauncher();
+  chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+    if (req.cmd === 'open_panel') { togglePanel(true); sendResponse({ ok: true }); }
+    if (req.cmd === 'scan_inbox') { sendResponse({ emails: window.PhishGuardAdapter ? window.PhishGuardAdapter.extractVisibleEmails() : [] }); }
+  });
+})();
+
+
+// Move the injected launcher+panel into our mock inbox frame, and auto-open + scan
+requestAnimationFrame(() => {
+  const root = document.getElementById("pg-root");
+  const launcher = document.getElementById("phishguard-launcher");
+  if (launcher) root.appendChild(launcher);
+  setTimeout(() => {
+    launcher.click();
+    document.getElementById("pg-scan-visible").click();
+    const panel = document.getElementById("phishguard-panel");
+    if (panel) root.appendChild(panel);
+  }, 300);
+});
+
+document.querySelectorAll(".site-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".site-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    currentSite = tab.dataset.site;
+    const statusEl = document.querySelector("#phishguard-panel .pg-status");
+    if (statusEl) statusEl.innerHTML = `<span class="dot"></span>Protecting ${currentSite}`;
+  });
+});
+</script>
+</body>
+</html>

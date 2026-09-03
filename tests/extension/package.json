@@ -1,0 +1,10 @@
+{
+  "name": "phishguard-extension-tests",
+  "private": true,
+  "scripts": {
+    "test": "cd ../.. && node tests/extension/test_adapters.js && node tests/extension/test_panel.js && node tests/extension/test_quarantine_realtime.js && node tests/extension/test_gmail_label_quarantine.js && node tests/extension/test_realtime_premature_render.js && node tests/extension/test_scan_visible_order.js && node tests/extension/test_quarantine_view_filter.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

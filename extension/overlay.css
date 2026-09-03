@@ -1,20 +1,269 @@
-:root{--color-primary:#3b82f6;--color-bg:#020617;--color-safe:#22c55e;--color-warn:#eab308;--color-danger:#ef4444;--color-accent:#fbbf24;--radius-lg:8px;--radius-xl:12px;--radius-2xl:16px;--radius-3xl:24px;--fs-base:16px;--fs-sm:14px;--fs-lg:20px;--fs-h2:24px;--gap-2:8px;--gap-4:16px;--gap-6:24px;--panel-border:#1f2937;--panel-muted:#1a2330;--text:#e6eef7;--text-sub:#9fb0c4}
-#phishguard-panel{position:fixed;right:16px;bottom:16px;width:360px;max-height:72vh;background:var(--color-bg);color:var(--text);border:1px solid var(--panel-border);border-radius:var(--radius-3xl);box-shadow:0 16px 40px rgba(0,0,0,.35);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;z-index:2147483647;display:flex;flex-direction:column;overflow:hidden}
-#phishguard-header{display:flex;align-items:center;gap:var(--gap-4);padding:12px 16px;border-bottom:1px solid var(--panel-border)}
-#phishguard-header img{width:22px;height:22px}
-#phishguard-header .title{font-weight:700;font-size:var(--fs-base)}
-#phishguard-actions{display:flex;gap:var(--gap-2);padding:10px 16px;border-bottom:1px solid var(--panel-border)}
-.pg-btn{padding:8px 10px;border-radius:var(--radius-xl);border:1px solid var(--panel-border);background:#0b1220;color:var(--text);font-size:var(--fs-sm);cursor:pointer}
-.pg-btn.primary{background:var(--color-primary);border-color:var(--color-primary);color:#fff}
-#phishguard-results{overflow:auto;padding:8px 12px}
-#phishguard-footer{display:flex;align-items:center;gap:var(--gap-4);padding:8px 12px;border-top:1px solid var(--panel-border);font-size:var(--fs-sm);color:var(--text-sub)}
-.pg-progress{height:6px;background:var(--panel-muted);border-radius:999px;overflow:hidden;flex:1}
-.pg-bar{height:100%;width:0%;background:var(--color-primary)}
-.pg-card{background:#0b1220;border:1px solid #1f2937;border-radius:12px;padding:12px;margin-bottom:10px;color:#fff}
-.pg-row{display:flex;justify-content:space-between;gap:12px}
-.pg-title{font-weight:800}
-.pg-sub{opacity:.85;font-size:12px}
-.pg-summary{margin-top:6px;font-size:13px;opacity:.95}
-.pg-right{display:flex;align-items:flex-start}
-.pg-pill{padding:4px 10px;border-radius:999px;font-weight:800;font-size:12px}
-.pg-meta{margin-top:8px;font-size:12px;opacity:.9}
+/* PhishGuard — refined dark-glass design system (v2) */
+:root{
+  --pg-bg:#05070d;
+  --pg-panel:rgba(9,12,22,.74);
+  --pg-panel-solid:#0a0e1a;
+  --pg-border:rgba(255,255,255,.09);
+  --pg-border-soft:rgba(255,255,255,.05);
+  --pg-text:#f1f5f9;
+  --pg-text-sub:#8b96ab;
+  --pg-text-faint:#5b6579;
+  --pg-accent-1:#6366f1;
+  --pg-accent-2:#22d3ee;
+  --pg-accent-grad:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#22d3ee 100%);
+  --pg-safe:#34d399;
+  --pg-safe-bg:rgba(52,211,153,.14);
+  --pg-warn:#fbbf24;
+  --pg-warn-bg:rgba(251,191,36,.14);
+  --pg-danger:#f87171;
+  --pg-danger-bg:rgba(248,113,113,.16);
+  --pg-r-sm:10px;
+  --pg-r-md:14px;
+  --pg-r-lg:20px;
+  --pg-r-xl:26px;
+  --pg-shadow:0 24px 60px -12px rgba(0,0,0,.55), 0 4px 16px rgba(0,0,0,.35);
+  --pg-font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  /* Generic translucent "wash" fills for subtle button/card backgrounds and borders, used
+     instead of one-off rgba(255,255,255,x) literals so the light theme below can flip them
+     to a black-based wash — a white-on-white wash would otherwise just vanish once the
+     panel itself turns light. */
+  --pg-wash-1:rgba(255,255,255,.03);
+  --pg-wash-2:rgba(255,255,255,.05);
+  --pg-wash-3:rgba(255,255,255,.06);
+  --pg-wash-4:rgba(255,255,255,.07);
+  --pg-line:rgba(255,255,255,.14);
+  --pg-line-strong:rgba(255,255,255,.16);
+  --pg-scrollbar:rgba(255,255,255,.15);
+}
+
+/* ---------- Light mode ----------
+   The panel is injected straight into the host page's DOM (Gmail/Outlook/Yahoo), so :root
+   here is that page's own <html> — this reads the *browser/OS* color-scheme preference, not
+   the host site's own light/dark setting, which is what "matches the computer" means. Since
+   virtually every rule below is written in terms of these custom properties, redefining them
+   here re-themes the whole panel, and — because @media (prefers-color-scheme) is live — it
+   re-applies instantly if the OS theme changes while the panel is open, no reload needed.
+   Risk colors (safe/warn/danger) get their own darker shade rather than reusing the dark
+   theme's bright green/amber/red as-is: those were tuned for contrast against near-black
+   cards, and unchanged would sit under 2:1 contrast against this theme's near-white cards. */
+@media (prefers-color-scheme: light){
+  :root{
+    --pg-bg:#f4f6fb;
+    --pg-panel:rgba(255,255,255,.88);
+    --pg-panel-solid:#ffffff;
+    --pg-border:rgba(15,23,42,.12);
+    --pg-border-soft:rgba(15,23,42,.07);
+    --pg-text:#0f172a;
+    --pg-text-sub:#475569;
+    --pg-text-faint:#64748b;
+    --pg-safe:#047857;
+    --pg-safe-bg:rgba(4,120,87,.12);
+    --pg-warn:#b45309;
+    --pg-warn-bg:rgba(180,83,9,.12);
+    --pg-danger:#b91c1c;
+    --pg-danger-bg:rgba(185,28,28,.12);
+    --pg-shadow:0 18px 40px -14px rgba(15,23,42,.20), 0 3px 10px rgba(15,23,42,.08);
+    --pg-wash-1:rgba(15,23,42,.035);
+    --pg-wash-2:rgba(15,23,42,.05);
+    --pg-wash-3:rgba(15,23,42,.06);
+    --pg-wash-4:rgba(15,23,42,.08);
+    --pg-line:rgba(15,23,42,.14);
+    --pg-line-strong:rgba(15,23,42,.18);
+    --pg-scrollbar:rgba(15,23,42,.18);
+  }
+}
+
+#phishguard-launcher{
+  position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;
+  background:var(--pg-accent-grad);border:none;cursor:pointer;z-index:2147483646;
+  box-shadow:0 10px 30px -6px rgba(99,102,241,.55), 0 2px 8px rgba(0,0,0,.4);
+  display:flex;align-items:center;justify-content:center;transition:transform .18s ease, box-shadow .18s ease;
+}
+#phishguard-launcher:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 14px 36px -6px rgba(99,102,241,.7), 0 4px 10px rgba(0,0,0,.45)}
+#phishguard-launcher svg{width:26px;height:26px}
+#phishguard-launcher .pg-launcher-badge{
+  position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;
+  background:var(--pg-danger);color:#fff;font:800 10px/18px var(--pg-font);text-align:center;
+  border:2px solid var(--pg-bg);display:none;
+}
+#phishguard-launcher .pg-launcher-badge.show{display:block}
+
+#phishguard-panel{
+  position:fixed;right:20px;bottom:20px;width:384px;height:560px;
+  min-width:320px;min-height:340px;
+  background:var(--pg-panel);color:var(--pg-text);
+  backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);
+  border:1px solid var(--pg-border);border-radius:var(--pg-r-xl);box-shadow:var(--pg-shadow);
+  font-family:var(--pg-font);z-index:2147483647;display:flex;flex-direction:column;overflow:hidden;
+  animation:pg-panel-in .28s cubic-bezier(.16,1,.3,1);
+}
+#phishguard-panel[hidden]{display:none}
+#phishguard-panel.pg-resizing{animation:none;transition:none !important;user-select:none}
+#phishguard-panel.pg-resizing #phishguard-results{pointer-events:none}
+@keyframes pg-panel-in{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+
+.pg-resize-handle{
+  position:absolute;top:0;left:0;width:20px;height:20px;cursor:nwse-resize;z-index:20;
+  display:flex;align-items:center;justify-content:center;border-top-left-radius:var(--pg-r-xl);
+}
+.pg-resize-handle svg{width:9px;height:9px;opacity:.3;transition:opacity .15s}
+.pg-resize-handle:hover svg,.pg-resize-handle:active svg{opacity:.85}
+.pg-size-btn{
+  width:24px;height:24px;border-radius:8px;border:1px solid transparent;background:transparent;
+  color:var(--pg-text-sub);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;
+}
+.pg-size-btn:hover{background:var(--pg-wash-3);color:var(--pg-text)}
+.pg-size-btn svg{width:14px;height:14px}
+
+#phishguard-header{
+  display:flex;align-items:center;gap:10px;padding:16px 16px 14px;
+  border-bottom:1px solid var(--pg-border-soft);background:linear-gradient(180deg,rgba(99,102,241,.10),transparent);
+  position:relative;
+}
+.pg-logo-mark{
+  width:32px;height:32px;border-radius:10px;background:var(--pg-accent-grad);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 4px 14px -4px rgba(99,102,241,.6);
+}
+.pg-logo-mark svg{width:18px;height:18px}
+#phishguard-header .pg-titles{flex:1;min-width:0}
+#phishguard-header .title{font-weight:800;font-size:14.5px;letter-spacing:-.01em;line-height:1.2}
+#phishguard-header .pg-status{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--pg-text-sub);margin-top:2px}
+#phishguard-header .pg-status .dot{width:6px;height:6px;border-radius:50%;background:var(--pg-safe);box-shadow:0 0 0 3px var(--pg-safe-bg);animation:pg-pulse 2.4s ease-in-out infinite}
+@keyframes pg-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+#pg-close{
+  width:28px;height:28px;border-radius:9px;border:1px solid transparent;background:transparent;
+  color:var(--pg-text-sub);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;
+}
+#pg-close:hover{background:var(--pg-wash-3);color:var(--pg-text)}
+
+#phishguard-actions{padding:12px 16px;border-bottom:1px solid var(--pg-border-soft);display:flex;flex-direction:column;gap:8px}
+.pg-segmented{display:flex;background:var(--pg-wash-1);border:1px solid var(--pg-border-soft);border-radius:var(--pg-r-md);padding:3px;gap:3px}
+.pg-seg-btn{
+  flex:1;padding:8px 10px;border-radius:10px;border:none;background:transparent;color:var(--pg-text-sub);
+  font:700 12.5px/1 var(--pg-font);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.pg-seg-btn svg{width:14px;height:14px;opacity:.85}
+.pg-seg-btn:hover{color:var(--pg-text)}
+.pg-seg-btn.active{background:var(--pg-panel-solid);color:var(--pg-text);box-shadow:0 2px 8px rgba(0,0,0,.35), inset 0 0 0 1px var(--pg-border)}
+.pg-row-actions{display:flex;gap:6px}
+.pg-btn{
+  padding:7px 12px;border-radius:9px;border:1px solid var(--pg-border);background:var(--pg-wash-1);
+  color:var(--pg-text-sub);font:600 11.5px/1 var(--pg-font);cursor:pointer;transition:.15s;
+}
+.pg-btn:hover{background:var(--pg-wash-4);color:var(--pg-text);border-color:var(--pg-line-strong)}
+.pg-btn.danger:hover{color:var(--pg-danger);border-color:rgba(248,113,113,.35)}
+
+#phishguard-results{overflow-y:auto;padding:12px 14px;flex:1;min-height:80px;scrollbar-width:thin;scrollbar-color:var(--pg-scrollbar) transparent}
+#phishguard-results::-webkit-scrollbar{width:6px}
+#phishguard-results::-webkit-scrollbar-thumb{background:var(--pg-line);border-radius:99px}
+.pg-empty{padding:32px 12px;text-align:center;color:var(--pg-text-faint);font-size:13px;line-height:1.6}
+.pg-empty svg{width:34px;height:34px;opacity:.35;margin-bottom:8px}
+
+.pg-card{
+  background:var(--pg-wash-1);border:1px solid var(--pg-border-soft);border-radius:var(--pg-r-md);
+  padding:12px 13px;margin-bottom:8px;cursor:pointer;transition:background .15s,border-color .15s,transform .15s;
+  animation:pg-card-in .32s cubic-bezier(.16,1,.3,1) backwards;
+}
+.pg-card:hover{background:var(--pg-wash-3);border-color:var(--pg-line)}
+.pg-card:active{transform:scale(.995)}
+@keyframes pg-card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* Placeholder shown in a scanned email's exact list position while its score request is
+   still in flight, so concurrent requests can resolve in any order without the finished
+   cards visually reordering themselves — see runScan()/scoreAndHandle() in panel.js. */
+.pg-card-loading{
+  background:var(--pg-wash-1);border:1px solid var(--pg-border-soft);border-radius:var(--pg-r-md);
+  padding:12px 13px;margin-bottom:8px;height:54px;
+  animation:pg-loading-pulse 1.1s ease-in-out infinite;
+}
+@keyframes pg-loading-pulse{0%,100%{opacity:.5}50%{opacity:.9}}
+.pg-row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.pg-left{display:flex;gap:10px;min-width:0;flex:1}
+.pg-avatar{
+  width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font:800 12px var(--pg-font);color:#fff;background:var(--pg-accent-grad);
+}
+.pg-text{min-width:0;flex:1}
+.pg-title{font-weight:700;font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-sub{opacity:.7;font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-summary{margin-top:5px;font-size:12px;line-height:1.45;color:var(--pg-text-sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pg-right{display:flex;align-items:flex-start;flex-shrink:0}
+.pg-pill{
+  display:flex;align-items:center;gap:4px;padding:4px 9px 4px 7px;border-radius:999px;
+  font:800 10.5px/1 var(--pg-font);letter-spacing:.02em;white-space:nowrap;
+}
+.pg-pill svg{width:11px;height:11px}
+.pg-pill.low{background:var(--pg-safe-bg);color:var(--pg-safe)}
+.pg-pill.medium{background:var(--pg-warn-bg);color:var(--pg-warn)}
+.pg-pill.high{background:var(--pg-danger-bg);color:var(--pg-danger)}
+
+.pg-meter-track{margin-top:10px;height:4px;border-radius:99px;background:var(--pg-wash-4);overflow:hidden}
+.pg-meter-fill{height:100%;border-radius:99px;transition:width .5s cubic-bezier(.16,1,.3,1)}
+.pg-meter-fill.low{background:var(--pg-safe)}
+.pg-meter-fill.medium{background:var(--pg-warn)}
+.pg-meter-fill.high{background:var(--pg-danger)}
+
+.pg-reasons{margin-top:9px;display:none;flex-wrap:wrap;gap:5px}
+.pg-card.expanded .pg-reasons{display:flex}
+.pg-chip{padding:3px 8px;border-radius:7px;background:var(--pg-wash-2);border:1px solid var(--pg-border-soft);font-size:10.5px;color:var(--pg-text-sub);line-height:1.4}
+.pg-meta-row{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:10.5px;color:var(--pg-text-faint)}
+.pg-expand-hint{display:flex;align-items:center;gap:3px}
+.pg-expand-hint svg{width:10px;height:10px;transition:transform .2s}
+.pg-card.expanded .pg-expand-hint svg{transform:rotate(180deg)}
+
+.pg-err{color:var(--pg-danger);font-size:12px;padding:10px;background:var(--pg-danger-bg);border-radius:var(--pg-r-sm)}
+
+#phishguard-footer{
+  display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--pg-border-soft);
+  background:rgba(0,0,0,.15);font-size:11px;color:var(--pg-text-sub);
+}
+#pg-count{white-space:nowrap;font-weight:600}
+.pg-progress{height:5px;background:var(--pg-wash-4);border-radius:99px;overflow:hidden;flex:1}
+.pg-bar{height:100%;width:0%;background:var(--pg-accent-grad);transition:width .3s ease;border-radius:99px}
+.pg-powered{font-size:9.5px;color:var(--pg-text-faint);white-space:nowrap;letter-spacing:.02em}
+
+/* ---------- Real-time protection toggle ---------- */
+#pg-realtime-toggle.active{color:var(--pg-safe);background:var(--pg-safe-bg)}
+#phishguard-header .pg-status .dot.dot-off{background:var(--pg-text-faint);box-shadow:0 0 0 3px var(--pg-wash-3);animation:none}
+
+/* ---------- Quarantine bar (shown above results whenever anything is quarantined) ---------- */
+.pg-quarantine-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 14px;background:var(--pg-danger-bg);border-bottom:1px solid rgba(248,113,113,.25);
+  font:600 11.5px/1.4 var(--pg-font);color:var(--pg-danger);
+}
+.pg-quarantine-bar[hidden]{display:none}
+.pg-quarantine-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.pg-link-btn{
+  background:transparent;border:none;color:inherit;font:800 11px var(--pg-font);cursor:pointer;
+  text-decoration:underline;text-underline-offset:2px;padding:2px 4px;flex-shrink:0;
+}
+.pg-link-btn:hover{opacity:.8}
+#pg-view-quarantined.active{background:var(--pg-line-strong);border-radius:6px;text-decoration:none}
+#pg-view-quarantined-gmail[hidden]{display:none}
+.pg-quarantine-filter-note{padding:20px 12px}
+
+/* ---------- "Removed from inbox" tag on a quarantined card ---------- */
+.pg-quarantined-tag{
+  margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:7px 10px;border-radius:var(--pg-r-sm);background:rgba(248,113,113,.10);
+  border:1px solid rgba(248,113,113,.22);font:700 11px/1.3 var(--pg-font);color:var(--pg-danger);
+}
+.pg-quarantined-tag span{display:flex;align-items:center;gap:6px}
+.pg-quarantined-tag svg{width:13px;height:13px;flex-shrink:0}
+.pg-quarantined-tag .pg-link-btn{color:var(--pg-danger)}
+
+/* ---------- Deep scan (sandboxed link visit) ---------- */
+.pg-deepscan-wrap{margin-top:9px}
+.pg-deepscan-btn{display:flex;align-items:center;gap:6px;width:100%;justify-content:center}
+.pg-deepscan-btn svg{width:13px;height:13px}
+.pg-deepscan-btn:disabled{opacity:.6;cursor:default}
+.pg-deepscan-results{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.pg-deepscan-results[hidden]{display:none}
+.pg-deepscan-row{
+  padding:8px 10px;border-radius:var(--pg-r-sm);background:var(--pg-wash-1);
+  border:1px solid var(--pg-border-soft);font-size:11px;color:var(--pg-text-sub);
+}
+.pg-deepscan-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.pg-deepscan-url{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--pg-text)}
+.pg-deepscan-flag{padding:2px 0;color:var(--pg-text-sub)}
