@@ -70,19 +70,11 @@
       <span>PhishGuard is connected and ready to use.</span>
     </div>
   </div>
-  <details class="card advanced">
-    <summary>Advanced (self-hosting)</summary>
-    <div class="advanced-body">
-      <label>API URL (backend)</label>
-      <input type="text" id="apiBase" placeholder="https://phishguard-api-877x.onrender.com">
-      <div class="hint">Only change this if you're running your own backend instead of the hosted one.</div>
-      <label>Dashboard URL (full report page)</label>
-      <input type="text" id="dashboardUrl" placeholder="https://phish-guard-swart.vercel.app">
-      <div class="hint">Only change this if you're running your own dashboard instead of the hosted one.</div>
-      <button id="save">Save settings</button>
-      <div class="status" id="status"></div>
-    </div>
-  </details>
+  <!-- The self-hosting Advanced section (API/Dashboard URL overrides) is not static markup
+       here on purpose. options.js builds it on the fly, and only for the developer's own
+       signed-in Chrome profile — see the ALLOWED_DEV_EMAILS check at the top of that file.
+       Everyone else only ever sees the "ready" card above. -->
+  <div id="advancedMount"></div>
 </body>
 <script src="options.js"></script>
 </html>
