@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "PhishGuard",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv2X7ymgTO5N5Ue6aZhHkjuSJ+P3DV5pmWFr0Qq7+os1SAnfzHd/yX5XaheWf0qqpcNVOYqHVXBBFv2k21l51jpPDxwax9pmehSdBNlTg5bfzIK988+x4Tc8Z76hqa9NjjT91ouWRzaFcIfDPSbDRLgO6uB8s1VJBArw90lIxE+6tILRHwmqppqDXRzGR1RqPwTGDk4XLfNNMkvRX7TePSf/5AqcZjQwDmqRBl9rsThN42qyWhClIFnUlahLgd5O92x4M8vpPGJzC+Mg5NYOKgblm/x2HgYeOdK696UBxJ7mC6RAU4SMOdTsp+lSFDYCCL0mVEnoJVPXD9e8+g0F8vwIDAQAB",
-  "version": "0.12",
+  "version": "0.13",
   "description": "AI-powered phishing detection with real-time protection, quarantine, and sandboxed link scanning for Gmail, Outlook on the web, and Yahoo Mail.",
   "permissions": [
     "activeTab",
@@ -18,7 +18,9 @@
     "https://mail.yahoo.com/*",
     "http://localhost:*/*",
     "http://127.0.0.1:*/*",
-    "https://gmail.googleapis.com/*"
+    "https://gmail.googleapis.com/*",
+    "https://phishguard-api-877x.onrender.com/*",
+    "https://phish-guard-swart.vercel.app/*"
   ],
   "optional_host_permissions": [
     "https://*/*"

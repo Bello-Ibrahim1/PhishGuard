@@ -113,8 +113,8 @@
     if (saved && saved.w && saved.h) applySize(panel, saved.w, saved.h);
   }
 
-  const DEFAULT_API = "http://localhost:8000";
-  const DEFAULT_DASHBOARD = "http://localhost:5173";
+  const DEFAULT_API = "https://phishguard-api-877x.onrender.com";
+  const DEFAULT_DASHBOARD = "https://phish-guard-swart.vercel.app";
   function getApiBase() { return new Promise(r => { chrome.storage.sync.get({ apiBase: DEFAULT_API }, o => r(o.apiBase || DEFAULT_API)); }); }
   function getDashboardUrl() { return new Promise(r => { chrome.storage.sync.get({ dashboardUrl: DEFAULT_DASHBOARD }, o => r(o.dashboardUrl || DEFAULT_DASHBOARD)); }); }
   function getRealtimeEnabled() { return new Promise(r => chrome.storage.sync.get({ realtimeProtection: true }, o => r(o.realtimeProtection !== false))); }

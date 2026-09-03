@@ -22,7 +22,7 @@ document.getElementById('options').addEventListener('click', (e) => {
 });
 document.getElementById('report').addEventListener('click', async (e) => {
   e.preventDefault();
-  chrome.storage.sync.get({ dashboardUrl: 'http://localhost:5173' }, o => window.open(o.dashboardUrl, '_blank'));
+  chrome.storage.sync.get({ dashboardUrl: 'https://phish-guard-swart.vercel.app' }, o => window.open(o.dashboardUrl, '_blank'));
 });
 
 function showNotice(text) {

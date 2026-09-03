@@ -8,8 +8,8 @@ function maybeRequestApiHost(apiBase) {
 }
 
 document.getElementById('save').addEventListener('click', function () {
-  const apiBase = document.getElementById('apiBase').value.trim() || 'http://localhost:8000';
-  const dashboardUrl = document.getElementById('dashboardUrl').value.trim() || 'http://localhost:5173';
+  const apiBase = document.getElementById('apiBase').value.trim() || 'https://phishguard-api-877x.onrender.com';
+  const dashboardUrl = document.getElementById('dashboardUrl').value.trim() || 'https://phish-guard-swart.vercel.app';
   maybeRequestApiHost(apiBase);
   chrome.storage.sync.set({ apiBase, dashboardUrl }, function () {
     const el = document.getElementById('status');
@@ -18,7 +18,7 @@ document.getElementById('save').addEventListener('click', function () {
   });
 });
 
-chrome.storage.sync.get({ apiBase: 'http://localhost:8000', dashboardUrl: 'http://localhost:5173' }, function (o) {
+chrome.storage.sync.get({ apiBase: 'https://phishguard-api-877x.onrender.com', dashboardUrl: 'https://phish-guard-swart.vercel.app' }, function (o) {
   document.getElementById('apiBase').value = o.apiBase;
   document.getElementById('dashboardUrl').value = o.dashboardUrl;
 });
