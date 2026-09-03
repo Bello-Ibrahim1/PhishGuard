@@ -64,7 +64,10 @@ function isDevAccount(email) {
 // permission. If nobody's signed into the profile, or it's not an allow-listed email,
 // this silently does nothing and the page stays on the plain "ready" card.
 try {
-  chrome.identity.getProfileUserInfo(function (info) {
+  // { accountStatus: 'ANY' } matters here: without it, Chrome only returns an email when
+  // the profile has Sync turned on. Most people are just signed into Google without Sync
+  // enabled, so the no-args form silently comes back empty and this would never match.
+  chrome.identity.getProfileUserInfo({ accountStatus: "ANY" }, function (info) {
     const email = info && info.email ? info.email : "";
     if (isDevAccount(email)) buildAdvancedSection();
   });
