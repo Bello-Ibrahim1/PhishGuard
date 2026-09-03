@@ -1,8 +1,11 @@
 import os, json, time
 from datetime import datetime
 import re
-from typing import List, Tuple
+import ipaddress
+import socket
+from typing import List, Tuple, Optional
 from urllib.parse import urlparse
+import requests
 
 LOG_PATH = os.path.join(os.path.dirname(__file__), "logs.json")
 
@@ -22,7 +25,6 @@ from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from .features import extract_email_features
-from .scorer import heuristic_score as base_heuristic_score, ml_predict
 from .model import load_model, score_text
 
 app=FastAPI()
@@ -83,7 +85,8 @@ PHISH_WORDING = [
     "limited time", "expires today", "expires in 24 hours", "final notice", "immediate action",
     "dear sir/madam", "dear beneficiary", "urgent request", "action required",
     "re: your account", "re: payment", "re: verification", "re: suspended",
-    "unsubscribe", "click to unsubscribe", "manage preferences",  # often in phish footers
+    "work from home", "voided check", "no experience required", "selected for a",
+    "direct deposit setup", "send a copy of your id", "wire your own funds",
 ]
 # Single-word urgency/credential triggers (strong when combined)
 URGENCY_CRED_WORDS = [
@@ -94,6 +97,7 @@ URGENCY_CRED_WORDS = [
 LEGIT_PATTERNS = [
     r"\b(unsubscribe|view in browser|sent from mail\.|mail\.google\.com)\b",
     r"\b(notification|newsletter|digest|no-reply@)\b",  # many legit newsletters
+    r"\b(verification code is|one-time code|one-time passcode|otp is)\b",  # legit 2FA/OTP emails
 ]
 # Suspicious sender/identifier patterns (fraud indicators)
 SENDER_SUSPICIOUS = re.compile(
@@ -102,6 +106,7 @@ SENDER_SUSPICIOUS = re.compile(
     re.I
 )
 IP_IN_HOST = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$")
+PUNYCODE_RE = re.compile(r"xn--", re.I)
 
 # Trusted sender domains: legitimate brands (payment receipts, order confirmations) not treated as phish
 _TRUSTED_BASE = {
@@ -112,6 +117,10 @@ _TRUSTED_BASE = {
     "capitalone.com", "americanexpress.com", "sofi.com", "udemy.com", "reddit.com",
     "quora.com", "oldnavy.com", "gap.com", "backmarket.com", "lyft.com", "doordash.com",
     "grubhub.com", "instacart.com", "zoom.us", "slack.com", "dropbox.com", "adobe.com",
+    "canva.com", "figma.com", "notion.so", "1password.com", "twilio.com", "calendly.com",
+    "airbnb.com", "etsy.com", "mailchimp.com", "docusign.net", "docusign.com", "okta.com",
+    "github.com", "atlassian.com", "asana.com", "trello.com", "hubspot.com", "salesforce.com",
+    "wellsfargo.com", "bankofamerica.com", "usps.com", "fedex.com", "ups.com",
 }
 def _trusted_domains():
     extra = os.environ.get("PHISHGUARD_TRUSTED_DOMAINS", "")
@@ -134,20 +143,70 @@ def _sender_domain(sender: str) -> str:
     return ""
 
 
-def _sender_looks_trusted(sender: str) -> bool:
-    """True if sender string looks like a known brand (display name or email)."""
-    if not sender:
+def _is_trusted_domain(domain: str) -> bool:
+    """True only if domain is an EXACT trusted domain or a subdomain of one
+    (e.g. 'mail.paypal.com' is trusted; 'paypal-verify.com' and 'paypal.com.evil.tk' are NOT).
+    Domain trust must never be based on display-name text, since that is fully attacker-controlled."""
+    if not domain:
         return False
-    s = sender.strip().lower()
-    # Match domain or display name (e.g. "PayPal", "service@paypal.com", "Boost Mobile")
-    brands = (
-        "paypal", "boost mobile", "boostmobile", "uber", "amazon", "best buy", "bestbuy",
-        "target", "walmart", "linkedin", "netflix", "udemy", "reddit", "quora", "old navy",
-        "lyft", "doordash", "sofi", "back market", "backmarket", "venmo", "chase",
-        "american express", "capital one", "ebay", "apple", "microsoft", "google", "stripe",
-        "spotify", "zoom", "slack", "dropbox", "adobe", "instacart", "grubhub",
-    )
-    return any(b in s for b in brands)
+    domain = domain.strip().lower()
+    trusted = _trusted_domains()
+    if domain in trusted:
+        return True
+    return any(domain.endswith("." + t) for t in trusted)
+
+
+# Brand keyword -> real domain(s), used ONLY to detect impersonation (a brand name showing up
+# in the display name or sender domain while the actual domain does NOT match that brand).
+_BRAND_DOMAINS = {
+    "paypal": ("paypal.com",), "boost mobile": ("boostmobile.com",), "boostmobile": ("boostmobile.com",),
+    "uber": ("uber.com",), "amazon": ("amazon.com",), "best buy": ("bestbuy.com",), "bestbuy": ("bestbuy.com",),
+    "target": ("target.com",), "walmart": ("walmart.com",), "linkedin": ("linkedin.com",),
+    "netflix": ("netflix.com",), "udemy": ("udemy.com",), "reddit": ("reddit.com",), "quora": ("quora.com",),
+    "old navy": ("oldnavy.com",), "lyft": ("lyft.com",), "doordash": ("doordash.com",), "sofi": ("sofi.com",),
+    "venmo": ("venmo.com",), "chase": ("chase.com",), "american express": ("americanexpress.com",),
+    "capital one": ("capitalone.com",), "ebay": ("ebay.com",), "apple": ("apple.com",),
+    "microsoft": ("microsoft.com",), "google": ("google.com", "gmail.com"), "stripe": ("stripe.com",),
+    "spotify": ("spotify.com",), "zoom": ("zoom.us",), "slack": ("slack.com",), "dropbox": ("dropbox.com",),
+    "adobe": ("adobe.com",), "instacart": ("instacart.com",), "grubhub": ("grubhub.com",),
+    "wells fargo": ("wellsfargo.com",), "bank of america": ("bankofamerica.com",), "docusign": ("docusign.net", "docusign.com"),
+    "okta": ("okta.com",), "usps": ("usps.com",), "irs": ("irs.gov",),
+}
+
+
+def _brand_impersonation(sender: str, subject: str, body: str):
+    """Detect a brand name in the sender display-name/domain (or subject) whose ACTUAL sending
+    domain does not match that brand's real domain(s) -> classic spoofing/typosquat pattern.
+    Returns (brand_name or None)."""
+    sender_l = (sender or "").lower()
+    domain = _sender_domain(sender)
+    text_l = f"{sender_l} {subject or ''}".lower()
+    for brand, real_domains in _BRAND_DOMAINS.items():
+        if brand not in text_l:
+            continue
+        if domain and any(domain == d or domain.endswith("." + d) for d in real_domains):
+            continue  # genuinely from the brand's real domain
+        return brand
+    return None
+
+
+def _domain_lookalike_brand(host: str):
+    """A link/redirect domain that contains or closely resembles a known brand name but does
+    NOT match that brand's real domain(s) -> classic typosquat/lookalike pattern (e.g.
+    'paypal-verify.tk' or 'paypa1-secure.com'). Distinct from _brand_impersonation, which looks
+    at sender text; this looks at a URL's actual host."""
+    if not host:
+        return None
+    host_l = host.lower()
+    host_key = host_l.replace("-", "").replace(".", "")
+    for brand, real_domains in _BRAND_DOMAINS.items():
+        brand_key = brand.replace(" ", "")
+        if brand_key not in host_key:
+            continue
+        if any(host_l == d or host_l.endswith("." + d) for d in real_domains):
+            continue  # genuinely the brand's real domain
+        return brand
+    return None
 
 def extract_urls(text: str):
     urls = URL_RE.findall(text or "")
@@ -204,7 +263,21 @@ def _identifier_score(subject: str, body: str, urls: list, domains: list) -> Tup
                 break
         except Exception:
             pass
-    return min(score, 5), reasons[:4]
+    # Punycode/IDN domains are a classic homograph-attack technique (displaying as
+    # e.g. "paypal.com" while actually resolving to a different, attacker-controlled host).
+    for d in domains:
+        if PUNYCODE_RE.search(d):
+            score += 2
+            reasons.append("Punycode/IDN domain in link (possible homograph attack)")
+            break
+    # A link domain that resembles a known brand but isn't that brand's real domain.
+    for d in domains:
+        brand = _domain_lookalike_brand(d)
+        if brand:
+            score += 3
+            reasons.append(f"Link domain resembles {brand.title()} but isn't its real domain")
+            break
+    return min(score, 5), reasons[:6]
 
 def _legit_discount(text: str) -> float:
     """Return 0..1 discount to reduce score for likely legitimate content."""
@@ -218,11 +291,15 @@ def _legit_discount(text: str) -> float:
     return min(discount, 0.35)
 
 def heuristic_score(subject: str, body: str, sender: str = ""):
-    """High-accuracy heuristic: wording + identifiers. Trusted senders get lower wording score."""
+    """High-accuracy heuristic: wording + identifiers. Trusted senders get lower wording score.
+    Trust is based ONLY on the actual sending domain (never on display-name text, which an
+    attacker fully controls). A brand name appearing in the sender/subject while the real
+    domain does NOT match that brand is treated as strong impersonation evidence instead."""
     text = f"{subject or ''} {body or ''}".replace("\n", " ")
     urls, domains = extract_urls(body or "")
     domain = _sender_domain(sender)
-    trusted = (domain in _trusted_domains() if domain else False) or _sender_looks_trusted(sender)
+    trusted = _is_trusted_domain(domain)
+    impersonated_brand = _brand_impersonation(sender, subject, body)
 
     score = 0
     reasons = []
@@ -235,6 +312,10 @@ def heuristic_score(subject: str, body: str, sender: str = ""):
     score += i_score
     reasons.extend(i_reasons)
 
+    if impersonated_brand:
+        score += 4
+        reasons.insert(0, f"Sender impersonates {impersonated_brand.title()} (domain does not match)")
+
     if urls and not reasons:
         score += 1
         reasons.append("Contains external URL")
@@ -245,34 +326,60 @@ def heuristic_score(subject: str, body: str, sender: str = ""):
 
     discount = _legit_discount(text)
     score = max(0, int(round(score * (1.0 - discount))))
-    if trusted:
+    if trusted and not impersonated_brand:
         score = max(0, score - 4)
     return min(score, 10), reasons[:5], urls, domains
 
-def blend_model_with_heuristics(model_prob: float, heur_score: int, trusted_sender: bool = False):
+# --- Unified risk classification (efficient, evidence-based) ---
+def _has_strong_phish_evidence(heur_reasons: List[str]) -> bool:
+    """True if reasons include high-confidence phish signals (not just single words like 'payment')."""
+    strong = (
+        "Phishing wording:",
+        "URL shortener",
+        "IP address in URL",
+        "Many external links",
+        "Very short message with urgency",
+        "Sender impersonates",
+        "Punycode/IDN domain",
+        "Link domain resembles",
+    )
+    return any(s in r for r in (heur_reasons or []) for s in strong)
+
+
+def classify_risk(
+    model_prob: float,
+    heur_score: int,
+    heur_reasons: List[str],
+    trusted_sender: bool,
+) -> Tuple[int, str, int]:
     """
-    Calibrated blend: model + heuristics.
-    trusted_sender: known brands never get High; usually Low unless strong phish signals.
+    Single, efficient risk classifier: weighted combined score + explicit rules.
+    Returns (total_score, risk_level, model_pts).
+    - High: only when we have strong evidence (phish phrases, shorteners, etc.) AND high model prob.
+    - Medium: some signals or uncertain model; never High for trusted senders.
+    - Low: few/no signals, or trusted sender, or low model prob.
     """
+    # Combined score: 60% model, 40% heuristics (normalized 0..10 -> 0..1)
+    heur_norm = min(1.0, heur_score / 10.0)
+    combined = 0.6 * model_prob + 0.4 * heur_norm
+    model_pts = min(5, int(round(model_prob * 5.0)))
+    total = heur_score + model_pts
+
     if trusted_sender:
-        model_points = min(2, int(round(model_prob * 2)))
-        total = heur_score + model_points
+        total = min(total, heur_score + min(2, int(round(model_prob * 2))))
         if total >= 5:
-            risk = "Medium"
-        else:
-            risk = "Low"
-        return total, risk, model_points
-    model_points = min(5, int(round(model_prob * 5.5)))
-    total = heur_score + model_points
-    if model_prob >= 0.90 or total >= 8:
-        risk = "High"
-    elif total >= 6 or (model_prob >= 0.75 and heur_score >= 1):
-        risk = "High"
-    elif total >= 4 or model_prob >= 0.58:
-        risk = "Medium"
-    else:
-        risk = "Low"
-    return total, risk, model_points
+            return total, "Medium", min(2, model_pts)
+        return total, "Low", min(2, model_pts)
+
+    strong_evidence = _has_strong_phish_evidence(heur_reasons)
+
+    if combined >= 0.75 and (model_prob >= 0.82 or strong_evidence):
+        return total, "High", model_pts
+    if combined >= 0.70 and strong_evidence:
+        return total, "High", model_pts
+    if combined >= 0.35 or total >= 3:
+        return total, "Medium", model_pts
+    return total, "Low", model_pts
 
 class EmailInput(BaseModel):
     sender_email:str=''
@@ -295,13 +402,13 @@ def scan_batch(inp: BatchScoreIn):
         body = (item.body or "").strip()
         sender = (getattr(item, "sender", None) or "").strip()
         domain = _sender_domain(sender)
-        trusted_sender = domain in _trusted_domains() if domain else False
         text = f"{subject} {body}"
         model_out = score_text(text)
         prob = float(model_out.get("prob_phish", 0.0))
         h_score, h_reasons, urls, domains = heuristic_score(subject, body, sender)
-        total, risk, _ = blend_model_with_heuristics(prob, h_score, trusted_sender=trusted_sender)
-        threat_pct = round((prob or (total / 10)) * 100)
+        trusted_sender = _is_trusted_domain(domain) and not _brand_impersonation(sender, subject, body)
+        total, risk, _ = classify_risk(prob, h_score, h_reasons, trusted_sender)
+        threat_pct = round(min(10, total) / 10 * 100)  # derived from final (trust/impersonation-adjusted) score, not raw prob
         results.append({
             "subject": subject[:120],
             "risk": risk,
@@ -331,8 +438,8 @@ def scan_gmail(max_results: int = 50):
     def score_fn(s: str, b: str):
         model_out = score_text(f"{s} {b}")
         prob = float(model_out.get("prob_phish", 0.0))
-        h_score, _, _, _ = heuristic_score(s, b)
-        total, risk, _ = blend_model_with_heuristics(prob, h_score)
+        h_score, h_reasons, _, _ = heuristic_score(s, b, "")
+        total, risk, _ = classify_risk(prob, h_score, h_reasons, trusted_sender=False)
         return {"risk": risk, "threat_pct": round((prob or (total / 10)) * 100)}
 
     try:
@@ -360,7 +467,7 @@ def email_score(inp: ScoreIn):
     sender = (inp.sender or "").strip()
     text = f"{subject} {body}".strip()
     domain = _sender_domain(sender)
-    trusted_sender = (domain in _trusted_domains() if domain else False) or _sender_looks_trusted(sender)
+    trusted_sender = _is_trusted_domain(domain) and not _brand_impersonation(sender, subject, body)
 
     # 1) Model probability
     model_out = score_text(text)
@@ -369,8 +476,8 @@ def email_score(inp: ScoreIn):
     # 2) Heuristics (trusted senders get lower score for "payment" etc.)
     h_score, h_reasons, urls, domains = heuristic_score(subject, body, sender)
 
-    # 3) Blend (trusted senders capped at Medium)
-    total, risk, model_pts = blend_model_with_heuristics(prob, h_score, trusted_sender=trusted_sender)
+    # 3) Unified risk classification (evidence-based, efficient)
+    total, risk, model_pts = classify_risk(prob, h_score, h_reasons, trusted_sender)
 
     # 4) Optional OpenAI second opinion (when OPENAI_API_KEY is set and use_openai=True)
     if getattr(inp, "use_openai", True):
@@ -404,7 +511,7 @@ def email_score(inp: ScoreIn):
 
     summary = summarize(subject, body)
     prob = locals().get("prob", None)  # if you have prob, use it; else None
-    threat_pct = round((prob or (total/10)) * 100)
+    threat_pct = round(min(10, total) / 10 * 100)  # derived from final (trust/impersonation-adjusted) score, not raw prob
 
     iocs = {
         "urls": urls,
@@ -421,6 +528,150 @@ def email_score(inp: ScoreIn):
         "reasons": clean_reasons[:3],   # top few, human-friendly
         "iocs": iocs,                   # unchanged
     }
+
+# --- Sandboxed link deep-scan: PhishGuard's backend visits the link, never the user's own
+# browser/device, so a suspicious URL never has to be opened by a real person. This is a
+# heuristic, non-JS-executing inspection (a plain HTTP GET + HTML parse) — it will not catch a
+# page that only reveals a credential form after running JavaScript, and that limitation is
+# intentional to keep this fast and dependency-light; it is not a substitute for a full
+# browser-based sandbox. Basic SSRF protections block requests to private/internal networks.
+_PRIVATE_NETS = [ipaddress.ip_network(cidr) for cidr in (
+    "0.0.0.0/8", "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+    "169.254.0.0/16", "::1/128", "fc00::/7", "fe80::/10",
+)]
+
+def _is_blocked_ip(ip_str: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return True  # unparseable -> block, fail closed
+    if any(ip in net for net in _PRIVATE_NETS):
+        return True
+    return bool(ip.is_reserved or ip.is_multicast or ip.is_link_local or ip.is_loopback or ip.is_unspecified)
+
+def _resolve_host_safe(host: str):
+    """Resolve a hostname. Returns (ips, reason): ips is a non-empty set only if resolution
+    succeeded AND none of the resolved addresses are private/internal; otherwise ips is None
+    and reason explains why ("dns" = couldn't resolve at all, "private" = resolved but blocked)."""
+    if not host:
+        return None, "empty host"
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except Exception:
+        return None, "dns"
+    ips = {info[4][0] for info in infos}
+    if not ips:
+        return None, "dns"
+    if any(_is_blocked_ip(ip) for ip in ips):
+        return None, "private"
+    return ips, None
+
+
+class LinkScanIn(BaseModel):
+    url: str
+    expected_brand: str = ""  # optional: brand the email claimed to be from, e.g. "paypal"
+
+
+@app.post("/scan/link_deepscan")
+def link_deepscan(inp: LinkScanIn):
+    """Visit a link inside PhishGuard's own sandboxed backend request (not the user's browser),
+    follow redirects, and inspect the final page for phishing signals — so the user never has
+    to click a suspicious link themselves to find out where it goes."""
+    url = (inp.url or "").strip()
+    result = {
+        "url": url, "ok": False, "final_url": None, "status_code": None,
+        "redirect_count": 0, "title": None, "flags": [], "risk": "Unknown",
+    }
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        result["flags"] = ["Could not parse this as a URL"]
+        return result
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        result["flags"] = ["Not an http(s) URL"]
+        return result
+
+    host = (parsed.hostname or "").lower()
+    ips, block_reason = _resolve_host_safe(host)
+    if not ips:
+        if block_reason == "dns":
+            result["flags"] = ["Could not resolve this domain (DNS lookup failed, or no network access from this backend)"]
+            result["risk"] = "Unknown"
+        else:
+            result["flags"] = ["Blocked: this host resolves to a private/internal address, not scanned"]
+            result["risk"] = "Blocked"
+        return result
+
+    try:
+        resp = requests.get(
+            url, timeout=8, allow_redirects=True, stream=False,
+            headers={"User-Agent": "Mozilla/5.0 (compatible; PhishGuardSandbox/1.0)"},
+        )
+    except requests.exceptions.SSLError:
+        result["flags"] = ["SSL/certificate error while connecting"]
+        result["risk"] = "Medium"
+        return result
+    except requests.exceptions.Timeout:
+        result["flags"] = ["Timed out — the site may be slow, unreachable, or evasive"]
+        result["risk"] = "Medium"
+        return result
+    except requests.exceptions.RequestException as e:
+        result["flags"] = [f"Could not reach the site ({type(e).__name__})"]
+        result["risk"] = "Medium"
+        return result
+
+    final_url = resp.url
+    final_host = (urlparse(final_url).hostname or "").lower()
+    final_ips, final_block_reason = _resolve_host_safe(final_host)
+    if not final_ips and final_block_reason == "private":
+        result["flags"] = ["Blocked: redirected to a private/internal address"]
+        result["risk"] = "Blocked"
+        return result
+
+    result.update({
+        "ok": True,
+        "final_url": final_url,
+        "status_code": resp.status_code,
+        "redirect_count": len(resp.history),
+    })
+
+    html = (resp.text or "")[:200000]
+    title_m = re.search(r"<title[^>]*>(.*?)</title>", html, re.I | re.S)
+    if title_m:
+        result["title"] = re.sub(r"\s+", " ", title_m.group(1)).strip()[:200]
+    has_password_field = bool(re.search(r'type=["\']?password', html, re.I))
+
+    flags, score = [], 0
+    if resp.history:
+        flags.append(f"Redirected {len(resp.history)}x before landing on the final page")
+        score += 1
+    if final_host and host and final_host != host:
+        flags.append(f"Final domain ({final_host}) differs from the link's domain ({host})")
+        score += 1
+    if has_password_field:
+        flags.append("Final page has a password field")
+        score += 2
+    lookalike_brand = _domain_lookalike_brand(final_host) or _domain_lookalike_brand(host)
+    if lookalike_brand:
+        flags.append(f"Domain resembles {lookalike_brand.title()} but isn't its real domain")
+        score += 3
+    if inp.expected_brand:
+        brand = inp.expected_brand.strip().lower()
+        real_domains = _BRAND_DOMAINS.get(brand)
+        if real_domains and not any(final_host == d or final_host.endswith("." + d) for d in real_domains):
+            flags.append(f"Email claimed to be {brand.title()} but this link doesn't go to {brand.title()}'s real domain")
+            score += 3
+    if IP_IN_HOST.match(final_host or ""):
+        flags.append("Final URL host is a raw IP address")
+        score += 2
+    if PUNYCODE_RE.search(final_host or "") or PUNYCODE_RE.search(host or ""):
+        flags.append("Punycode/IDN domain (possible homograph attack)")
+        score += 2
+
+    result["flags"] = flags
+    result["risk"] = "High" if score >= 4 else ("Medium" if score >= 2 else "Low")
+    return result
+
 
 class LogItem(BaseModel):
     sender: str = ""
@@ -467,16 +718,55 @@ def get_reports():
     return {"reports": reports}
 
 REPORTS = []
+# Was capped at 1000, which silently truncated anything past the first ~1000
+# emails scanned — a real problem once "Full inbox (Gmail API)" can genuinely
+# scan an entire multi-thousand-message inbox in one run. 50000 gives headroom
+# well past any single inbox scan; each entry is just a few short strings, so
+# the memory cost of holding that many is trivial.
+REPORTS_CAP = 50000
+
+# The extension re-scores the same email whenever it's still visible on a later "Scan
+# visible" click, whenever real-time protection's MutationObserver fires again, or if it's
+# caught by both a full API scan and the live inbox — every one of those used to append a
+# brand new /ingest/report entry for the SAME email, so the same message could pile up as
+# several duplicate rows (and inflate the Total/Low/Medium/High counts) the more you used
+# the extension. Give each report a stable identity and upsert instead of blindly
+# appending: the real Gmail message id (gmail_link) when we have it, since that uniquely
+# identifies the actual email regardless of which scan found it; otherwise sender+subject+
+# received-time, which in practice only collides for what really is the same email.
+REPORTS_INDEX: dict[str, int] = {}  # identity key -> index into REPORTS
+
+def _report_key(item: dict) -> str:
+    gmail_link = item.get("gmail_link")
+    if gmail_link:
+        return f"link:{gmail_link}"
+    # Source included so an Outlook and a Yahoo report can never collide on identity just
+    # because they happen to share a sender/subject/time — each mailbox's own reports only
+    # ever dedup against themselves.
+    return f"c:{item.get('source','')}|{item.get('sender','')}|{item.get('subject','')}|{item.get('time','')}"
+
+def _reindex_reports():
+    REPORTS_INDEX.clear()
+    for i, r in enumerate(REPORTS):
+        REPORTS_INDEX[_report_key(r)] = i
 
 @app.post("/ingest/report")
 def ingest_report(item: dict):
-    REPORTS.append(item)
-    if len(REPORTS) > 1000:
-        del REPORTS[:-1000]
-    return {"ok": True, "count": len(REPORTS)}
+    key = _report_key(item)
+    idx = REPORTS_INDEX.get(key)
+    is_duplicate = idx is not None and idx < len(REPORTS)
+    if is_duplicate:
+        REPORTS[idx] = item  # refresh in place (e.g. risk/reasons changed on a re-score)
+    else:
+        REPORTS.append(item)
+        REPORTS_INDEX[key] = len(REPORTS) - 1
+        if len(REPORTS) > REPORTS_CAP:
+            del REPORTS[:-REPORTS_CAP]
+            _reindex_reports()  # trimming shifts every remaining index
+    return {"ok": True, "count": len(REPORTS), "duplicate": is_duplicate}
 
 @app.get("/reports/recent")
-def reports_recent(limit: int = 50):
+def reports_recent(limit: int = 200):
     return REPORTS[-limit:][::-1]
 
 @app.get("/reports/summary")

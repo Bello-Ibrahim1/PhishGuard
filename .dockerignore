@@ -1,0 +1,14 @@
+venv/
+.venv/
+node_modules/
+ui/
+ui copy/
+datasets/
+ml/*.csv
+ml/processed/
+ml/augment_synthetic*.csv
+tests/
+dist/
+.git/
+*.mov
+__pycache__/

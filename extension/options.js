@@ -1,8 +1,20 @@
+function maybeRequestApiHost(apiBase) {
+  try {
+    const origin = new URL(apiBase).origin + "/*";
+    if (chrome.permissions && chrome.permissions.request) {
+      chrome.permissions.request({ origins: [origin] }, () => {});
+    }
+  } catch (e) {}
+}
+
 document.getElementById('save').addEventListener('click', function () {
   const apiBase = document.getElementById('apiBase').value.trim() || 'http://localhost:8000';
   const dashboardUrl = document.getElementById('dashboardUrl').value.trim() || 'http://localhost:5173';
+  maybeRequestApiHost(apiBase);
   chrome.storage.sync.set({ apiBase, dashboardUrl }, function () {
-    alert('Saved. Reload Gmail for the extension to use the new URLs.');
+    const el = document.getElementById('status');
+    el.textContent = 'Saved. Reload your inbox tab for PhishGuard to use the new settings.';
+    setTimeout(() => { el.textContent = ''; }, 4000);
   });
 });
 
