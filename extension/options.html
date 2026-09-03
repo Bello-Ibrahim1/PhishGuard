@@ -46,6 +46,14 @@
     }
     button:hover{filter:brightness(1.08)}
     .status{font-size:12px;color:var(--pg-safe);margin-top:10px;min-height:16px}
+    .card.ready{padding:14px 18px}
+    .ready-row{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--pg-text-strong)}
+    details.advanced{padding:0;overflow:hidden}
+    details.advanced summary{cursor:pointer;padding:14px 18px;font-size:12px;font-weight:700;color:var(--pg-text-sub);list-style:none}
+    details.advanced summary::-webkit-details-marker{display:none}
+    details.advanced summary::before{content:"›";display:inline-block;margin-right:6px;transition:transform .15s ease}
+    details.advanced[open] summary::before{transform:rotate(90deg)}
+    details.advanced .advanced-body{padding:0 18px 18px}
   </style>
 </head>
 <body>
@@ -53,19 +61,28 @@
     <div class="logo"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5v6c0 5.2 3.4 9.7 8 11 4.6-1.3 8-5.8 8-11V5l-8-3z" fill="#fff"/><path d="M9 12.5l2 2 4-4.5" stroke="#4338ca" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
     <div>
       <h2>PhishGuard Settings</h2>
-      <div class="s">Point the extension at your backend</div>
+      <div class="s">You're all set — no setup required</div>
     </div>
   </div>
-  <div class="card">
-    <label>API URL (backend)</label>
-    <input type="text" id="apiBase" placeholder="https://phishguard-api-877x.onrender.com">
-    <div class="hint">Defaults to the hosted PhishGuard API (https://phishguard-api-877x.onrender.com). Only change this if you're running your own backend.</div>
-    <label>Dashboard URL (full report page)</label>
-    <input type="text" id="dashboardUrl" placeholder="https://phish-guard-swart.vercel.app">
-    <div class="hint">Defaults to the hosted PhishGuard dashboard (https://phish-guard-swart.vercel.app). Only change this if you're running your own dashboard.</div>
-    <button id="save">Save settings</button>
-    <div class="status" id="status"></div>
+  <div class="card ready">
+    <div class="ready-row">
+      <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><circle cx="12" cy="12" r="10" fill="var(--pg-safe)"/><path d="M8 12.5l2.5 2.5L16 9.5" stroke="var(--pg-panel-solid)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>PhishGuard is connected and ready to use.</span>
+    </div>
   </div>
+  <details class="card advanced">
+    <summary>Advanced (self-hosting)</summary>
+    <div class="advanced-body">
+      <label>API URL (backend)</label>
+      <input type="text" id="apiBase" placeholder="https://phishguard-api-877x.onrender.com">
+      <div class="hint">Only change this if you're running your own backend instead of the hosted one.</div>
+      <label>Dashboard URL (full report page)</label>
+      <input type="text" id="dashboardUrl" placeholder="https://phish-guard-swart.vercel.app">
+      <div class="hint">Only change this if you're running your own dashboard instead of the hosted one.</div>
+      <button id="save">Save settings</button>
+      <div class="status" id="status"></div>
+    </div>
+  </details>
 </body>
 <script src="options.js"></script>
 </html>
