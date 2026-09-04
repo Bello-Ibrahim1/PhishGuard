@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchSummary, fetchReports, type Summary, type Report } from "./api";
+import { fetchSummary, fetchReports, hasClientId, type Summary, type Report } from "./api";
 import { TopBar } from "./components/TopBar";
 import { StatCard, type RiskKey } from "./components/Cards";
 import { RiskPie } from "./components/RiskPie";
@@ -12,6 +12,11 @@ export default function App() {
   const [filter, setFilter] = useState<RiskKey>("All");
 
   useEffect(() => {
+    // Reports are stored per-installer now — without a ?uid=... on this page's own URL
+    // there is no safe data to show (see CLIENT_UID/hasClientId in api.ts), so this
+    // never even calls the backend in that case rather than showing someone else's data
+    // or silently polling an endpoint that will only ever return empty.
+    if (!hasClientId()) return;
     const load = async () => {
       try {
         const [s, r] = await Promise.all([fetchSummary(), fetchReports()]);
@@ -40,6 +45,37 @@ export default function App() {
     () => (filter === "All" ? items : items.filter((i) => i.risk === filter)),
     [items, filter]
   );
+
+  // Opened directly (no ?uid=...) rather than from the extension's "Full report" button —
+  // there's no installer to scope this to, so show that plainly instead of an empty
+  // dashboard that looks broken or, worse, one that fell back to showing everyone's data.
+  if (!hasClientId()) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <TopBar />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 40,
+            textAlign: "center",
+          }}
+        >
+          <div style={{ maxWidth: 420 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>
+              No report to show
+            </div>
+            <div style={{ fontSize: 13, opacity: 0.7, lineHeight: 1.5 }}>
+              Open this from PhishGuard's "Full report" button in the extension popup —
+              that link includes the id that connects it to your own scanned emails.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
