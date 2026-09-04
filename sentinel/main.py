@@ -175,19 +175,26 @@ _BRAND_DOMAINS = {
 
 
 def _brand_impersonation(sender: str, subject: str, body: str):
-    """Detect a brand name in the sender display-name/domain (or subject) whose ACTUAL sending
+    """Detect a brand name in the sender display-name/domain OR subject whose ACTUAL sending
     domain does not match that brand's real domain(s) -> classic spoofing/typosquat pattern.
-    Returns (brand_name or None)."""
+    Uses word-boundary matching so short brand keys (e.g. 'irs', 'target') don't match inside
+    unrelated words (e.g. 'first', 'targeting').
+    Returns (brand_name or None, in_sender: bool) -- in_sender distinguishes a brand claimed by
+    the sender itself (strong evidence) from a brand merely mentioned in the subject line
+    (weaker evidence -- could be a legitimate email that just references a partner brand)."""
     sender_l = (sender or "").lower()
+    subject_l = (subject or "").lower()
     domain = _sender_domain(sender)
-    text_l = f"{sender_l} {subject or ''}".lower()
     for brand, real_domains in _BRAND_DOMAINS.items():
-        if brand not in text_l:
+        pattern = r"\b" + re.escape(brand) + r"\b"
+        in_sender = bool(re.search(pattern, sender_l))
+        in_subject = bool(re.search(pattern, subject_l))
+        if not (in_sender or in_subject):
             continue
         if domain and any(domain == d or domain.endswith("." + d) for d in real_domains):
             continue  # genuinely from the brand's real domain
-        return brand
-    return None
+        return brand, in_sender
+    return None, False
 
 
 def _domain_lookalike_brand(host: str):
@@ -299,7 +306,7 @@ def heuristic_score(subject: str, body: str, sender: str = ""):
     urls, domains = extract_urls(body or "")
     domain = _sender_domain(sender)
     trusted = _is_trusted_domain(domain)
-    impersonated_brand = _brand_impersonation(sender, subject, body)
+    impersonated_brand, impersonation_in_sender = _brand_impersonation(sender, subject, body)
 
     score = 0
     reasons = []
@@ -313,8 +320,12 @@ def heuristic_score(subject: str, body: str, sender: str = ""):
     reasons.extend(i_reasons)
 
     if impersonated_brand:
-        score += 4
-        reasons.insert(0, f"Sender impersonates {impersonated_brand.title()} (domain does not match)")
+        if impersonation_in_sender:
+            score += 4
+            reasons.insert(0, f"Sender impersonates {impersonated_brand.title()} (domain does not match)")
+        else:
+            score += 2
+            reasons.insert(0, f"Subject mentions {impersonated_brand.title()}, but sender's domain doesn't match")
 
     if urls and not reasons:
         score += 1
@@ -406,7 +417,7 @@ def scan_batch(inp: BatchScoreIn):
         model_out = score_text(text)
         prob = float(model_out.get("prob_phish", 0.0))
         h_score, h_reasons, urls, domains = heuristic_score(subject, body, sender)
-        trusted_sender = _is_trusted_domain(domain) and not _brand_impersonation(sender, subject, body)
+        trusted_sender = _is_trusted_domain(domain) and not _brand_impersonation(sender, subject, body)[0]
         total, risk, _ = classify_risk(prob, h_score, h_reasons, trusted_sender)
         threat_pct = round(min(10, total) / 10 * 100)  # derived from final (trust/impersonation-adjusted) score, not raw prob
         results.append({
@@ -467,7 +478,7 @@ def email_score(inp: ScoreIn):
     sender = (inp.sender or "").strip()
     text = f"{subject} {body}".strip()
     domain = _sender_domain(sender)
-    trusted_sender = _is_trusted_domain(domain) and not _brand_impersonation(sender, subject, body)
+    trusted_sender = _is_trusted_domain(domain) and not _brand_impersonation(sender, subject, body)[0]
 
     # 1) Model probability
     model_out = score_text(text)
