@@ -20,6 +20,17 @@ document.getElementById('options').addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
+const HOSTED_DASHBOARD = 'https://phish-guard-swart.vercel.app';
+
+// Before Advanced settings existed, some profiles saved a literal "http://localhost:..."
+// as their dashboardUrl. That stale value now permanently overrides the hosted default
+// with no way for a non-dev account to see or clear it, since only the developer's own
+// account sees the Settings fields that could fix it. Self-heal instead: treat a stored
+// local dev address as stale and fall back to (and re-save) the real hosted URL.
+function isLocalUrl(url) {
+  return typeof url === 'string' && /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(url.trim());
+}
+
 document.getElementById('report').addEventListener('click', async (e) => {
   e.preventDefault();
   // pgClientId is the same private per-install id panel.js attaches to every scored
@@ -28,11 +39,14 @@ document.getElementById('report').addEventListener('click', async (e) => {
   // generated yet (e.g. Settings/report opened before any email was ever scanned),
   // generate it now so the dashboard link is scoped from the very first open too.
   chrome.storage.sync.get(
-    { dashboardUrl: 'https://phish-guard-swart.vercel.app', pgClientId: null },
+    { dashboardUrl: HOSTED_DASHBOARD, pgClientId: null },
     o => {
+      const dashboardUrl = (!o.dashboardUrl || isLocalUrl(o.dashboardUrl)) ? HOSTED_DASHBOARD : o.dashboardUrl;
+      if (dashboardUrl !== o.dashboardUrl) chrome.storage.sync.set({ dashboardUrl });
+
       const openWithId = (id) => {
-        const sep = o.dashboardUrl.includes('?') ? '&' : '?';
-        window.open(o.dashboardUrl + sep + 'uid=' + encodeURIComponent(id), '_blank');
+        const sep = dashboardUrl.includes('?') ? '&' : '?';
+        window.open(dashboardUrl + sep + 'uid=' + encodeURIComponent(id), '_blank');
       };
       if (o.pgClientId) {
         openWithId(o.pgClientId);
