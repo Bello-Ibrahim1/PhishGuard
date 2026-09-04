@@ -252,6 +252,9 @@
 .pg-quarantined-tag span{display:flex;align-items:center;gap:6px}
 .pg-quarantined-tag svg{width:13px;height:13px;flex-shrink:0}
 .pg-quarantined-tag .pg-link-btn{color:var(--pg-danger)}
+.pg-quarantine-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.pg-retry-gmail-btn{color:var(--pg-text)!important;opacity:.85}
+.pg-retry-gmail-btn:hover{opacity:1}
 
 /* ---------- Deep scan (sandboxed link visit) ---------- */
 .pg-deepscan-wrap{margin-top:9px}

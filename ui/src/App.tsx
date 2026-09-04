@@ -131,7 +131,7 @@ export default function App() {
           <RiskBar data={data} active={filter} onBarClick={(name) => toggle(name as Exclude<RiskKey, "All">)} />
         </div>
         <div style={{ gridColumn: "span 12" }}>
-          <ReportsTable items={filtered} filter={filter} onClearFilter={() => setFilter("All")} />
+          <ReportsTable items={filtered} filter={filter} onClearFilter={() => setFilter("All")} summary={sum} />
         </div>
       </div>
     </div>

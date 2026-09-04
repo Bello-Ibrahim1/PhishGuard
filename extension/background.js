@@ -283,12 +283,14 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   if (req.cmd === 'gmail_label_quarantine' || req.cmd === 'gmail_label_restore') {
     (async () => {
       try {
-        // Non-interactive: labeling can be triggered by real-time protection while the user
-        // is just casually browsing, so this must never pop an unexpected Google sign-in
-        // window mid-scroll. Until the broader "manage your mail" scope has been granted
-        // once (e.g. by running an API scan, which does use interactive auth), this fails
-        // fast and the caller falls back to hide-only quarantine.
-        const token = await getAuthToken(false);
+        // Non-interactive by default: labeling can be triggered by real-time protection
+        // while the user is just casually browsing, so this must never pop an unexpected
+        // Google sign-in window mid-scroll. Until the broader "manage your mail" scope has
+        // been granted once (e.g. by running an API scan, or by req.interactive below), this
+        // fails fast and the caller falls back to hide-only quarantine, surfacing a "Grant
+        // Gmail access" retry button the user can click on purpose — that click is what sets
+        // req.interactive so the consent popup only ever appears after a deliberate action.
+        const token = await getAuthToken(!!req.interactive);
         const labelId = await getOrCreateQuarantineLabelId(token);
         if (req.cmd === 'gmail_label_quarantine') {
           await modifyMessageLabels(req.msgId, token, { add: [labelId] });
