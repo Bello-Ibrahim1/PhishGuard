@@ -117,6 +117,24 @@
   const DEFAULT_DASHBOARD = "https://phish-guard-swart.vercel.app";
   function getApiBase() { return new Promise(r => { chrome.storage.sync.get({ apiBase: DEFAULT_API }, o => r(o.apiBase || DEFAULT_API)); }); }
   function getDashboardUrl() { return new Promise(r => { chrome.storage.sync.get({ dashboardUrl: DEFAULT_DASHBOARD }, o => r(o.dashboardUrl || DEFAULT_DASHBOARD)); }); }
+
+  // A private, random per-install id — generated once and kept in chrome.storage.sync (so
+  // it follows this Chrome profile across machines, same as every other PhishGuard
+  // setting) — sent with every /ingest/report so the backend can keep each installer's
+  // scanned emails in their own bucket instead of one shared list everyone could see.
+  // It's never displayed anywhere and there's no way to look one up from the outside; it
+  // is NOT a real login (anyone who somehow obtained a specific id could open that one
+  // person's dashboard), but it means a stranger can't browse anyone else's data by default.
+  function getClientId() {
+    return new Promise(r => {
+      chrome.storage.sync.get({ pgClientId: null }, o => {
+        if (o.pgClientId) { r(o.pgClientId); return; }
+        const id = (crypto && crypto.randomUUID) ? crypto.randomUUID()
+          : 'pg-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+        chrome.storage.sync.set({ pgClientId: id }, () => r(id));
+      });
+    });
+  }
   function getRealtimeEnabled() { return new Promise(r => chrome.storage.sync.get({ realtimeProtection: true }, o => r(o.realtimeProtection !== false))); }
   function setRealtimeEnabled(v) { chrome.storage.sync.set({ realtimeProtection: !!v }); }
 
@@ -603,10 +621,12 @@
       setBadge(highCount);
       try {
         const base = await getApiBase();
+        const clientId = await getClientId();
         const gmailId = realGmailIdFor(msg);
         await fetch(base + '/ingest/report', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            client_id: clientId,
             time: resolveReceivedAt(msg) || new Date().toISOString(),
             risk: api.risk, sender: msg.sender, subject: msg.subject,
             body_preview: api.summary, reasons: api.reasons || [],

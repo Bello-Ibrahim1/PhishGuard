@@ -22,7 +22,27 @@ document.getElementById('options').addEventListener('click', (e) => {
 });
 document.getElementById('report').addEventListener('click', async (e) => {
   e.preventDefault();
-  chrome.storage.sync.get({ dashboardUrl: 'https://phish-guard-swart.vercel.app' }, o => window.open(o.dashboardUrl, '_blank'));
+  // pgClientId is the same private per-install id panel.js attaches to every scored
+  // email (see getClientId() there) — passed here as ?uid= so the dashboard only ever
+  // asks the backend for THIS install's reports, not everyone's. If it hasn't been
+  // generated yet (e.g. Settings/report opened before any email was ever scanned),
+  // generate it now so the dashboard link is scoped from the very first open too.
+  chrome.storage.sync.get(
+    { dashboardUrl: 'https://phish-guard-swart.vercel.app', pgClientId: null },
+    o => {
+      const openWithId = (id) => {
+        const sep = o.dashboardUrl.includes('?') ? '&' : '?';
+        window.open(o.dashboardUrl + sep + 'uid=' + encodeURIComponent(id), '_blank');
+      };
+      if (o.pgClientId) {
+        openWithId(o.pgClientId);
+      } else {
+        const id = (crypto && crypto.randomUUID) ? crypto.randomUUID()
+          : 'pg-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+        chrome.storage.sync.set({ pgClientId: id }, () => openWithId(id));
+      }
+    }
+  );
 });
 
 function showNotice(text) {

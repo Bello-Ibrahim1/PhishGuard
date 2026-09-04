@@ -1,5 +1,16 @@
 export const API_BASE = (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_URL) || "http://127.0.0.1:8000";
 
+/** The private per-install id the extension attaches to its own reports (see
+ *  getClientId() in panel.js), passed to this dashboard as ?uid=... when it's opened from
+ *  the extension's "Full report" button. Reports are stored per-id on the backend now
+ *  instead of one shared list, so without a uid there's nothing to safely show — every
+ *  fetch below is scoped to this value, and callers should check hasClientId() before
+ *  ever calling them. */
+export const CLIENT_UID = (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("uid")) || "";
+export function hasClientId(): boolean {
+  return CLIENT_UID.length > 0;
+}
+
 export type Summary = { total: number; by_risk: { Low: number; Medium: number; High: number } };
 export type Report = {
   email_subject?: string;
@@ -18,7 +29,7 @@ export type Report = {
 
 /** Dashboard data comes from the same place as the extension: /ingest/report → REPORTS */
 export async function fetchSummary(): Promise<Summary> {
-  const r = await fetch(`${API_BASE}/reports/summary`);
+  const r = await fetch(`${API_BASE}/reports/summary?uid=${encodeURIComponent(CLIENT_UID)}`);
   if (!r.ok) throw new Error(`summary failed ${r.status}`);
   const j = await r.json();
   return {
@@ -39,7 +50,7 @@ const RECENT_LIMIT = 20000;
 
 /** Recent reports from extension scans (same list as /reports/summary) */
 export async function fetchReports(): Promise<Report[]> {
-  const r = await fetch(`${API_BASE}/reports/recent?limit=${RECENT_LIMIT}`);
+  const r = await fetch(`${API_BASE}/reports/recent?uid=${encodeURIComponent(CLIENT_UID)}&limit=${RECENT_LIMIT}`);
   if (!r.ok) throw new Error(`reports failed ${r.status}`);
   const list = await r.json();
   if (!Array.isArray(list)) return [];

@@ -717,12 +717,21 @@ async def save_report(request: Request):
 def get_reports():
     return {"reports": reports}
 
-REPORTS = []
-# Was capped at 1000, which silently truncated anything past the first ~1000
-# emails scanned — a real problem once "Full inbox (Gmail API)" can genuinely
-# scan an entire multi-thousand-message inbox in one run. 50000 gives headroom
-# well past any single inbox scan; each entry is just a few short strings, so
-# the memory cost of holding that many is trivial.
+# Reports are partitioned per-user (keyed by the extension's private client_id, a random
+# id generated once per install — see getClientId() in panel.js) instead of one shared
+# list everyone's scans landed in. That older shared version meant anyone with the
+# dashboard URL could see every installer's scanned senders/subjects, not just their own —
+# fine for one person testing, not something to ship to real users. A client_id is not a
+# real authenticated account (nothing stops someone from guessing/sharing one), but it's
+# never displayed or discoverable, and it means each person's dashboard link only shows
+# their own data by default the way an unlisted-but-unauthenticated link normally does.
+REPORTS: dict[str, list] = {}          # client_id -> list of report dicts
+REPORTS_INDEX: dict[str, dict[str, int]] = {}  # client_id -> {identity key -> index}
+
+# Was capped at 1000 (then a single shared 50000), which either silently truncated a big
+# inbox scan or gave one giant list for everyone. Now each user gets their own 50000-entry
+# budget — still comfortably past any single inbox scan, and per-user strings are small
+# enough that this stays cheap even across a fair number of installs.
 REPORTS_CAP = 50000
 
 # The extension re-scores the same email whenever it's still visible on a later "Scan
@@ -734,8 +743,6 @@ REPORTS_CAP = 50000
 # appending: the real Gmail message id (gmail_link) when we have it, since that uniquely
 # identifies the actual email regardless of which scan found it; otherwise sender+subject+
 # received-time, which in practice only collides for what really is the same email.
-REPORTS_INDEX: dict[str, int] = {}  # identity key -> index into REPORTS
-
 def _report_key(item: dict) -> str:
     gmail_link = item.get("gmail_link")
     if gmail_link:
@@ -745,36 +752,51 @@ def _report_key(item: dict) -> str:
     # ever dedup against themselves.
     return f"c:{item.get('source','')}|{item.get('sender','')}|{item.get('subject','')}|{item.get('time','')}"
 
-def _reindex_reports():
-    REPORTS_INDEX.clear()
-    for i, r in enumerate(REPORTS):
-        REPORTS_INDEX[_report_key(r)] = i
+def _reindex_reports(client_id: str):
+    reports = REPORTS.get(client_id, [])
+    idx = {}
+    for i, r in enumerate(reports):
+        idx[_report_key(r)] = i
+    REPORTS_INDEX[client_id] = idx
 
 @app.post("/ingest/report")
 def ingest_report(item: dict):
+    # No client_id means an old/broken client — file it under a bucket nothing can ever
+    # read back (no /reports endpoint accepts an empty uid), rather than either crashing
+    # or silently mixing it into someone else's data.
+    client_id = (item.get("client_id") or "").strip() or "__no_client_id__"
+    reports = REPORTS.setdefault(client_id, [])
+    index = REPORTS_INDEX.setdefault(client_id, {})
+
     key = _report_key(item)
-    idx = REPORTS_INDEX.get(key)
-    is_duplicate = idx is not None and idx < len(REPORTS)
+    idx = index.get(key)
+    is_duplicate = idx is not None and idx < len(reports)
     if is_duplicate:
-        REPORTS[idx] = item  # refresh in place (e.g. risk/reasons changed on a re-score)
+        reports[idx] = item  # refresh in place (e.g. risk/reasons changed on a re-score)
     else:
-        REPORTS.append(item)
-        REPORTS_INDEX[key] = len(REPORTS) - 1
-        if len(REPORTS) > REPORTS_CAP:
-            del REPORTS[:-REPORTS_CAP]
-            _reindex_reports()  # trimming shifts every remaining index
-    return {"ok": True, "count": len(REPORTS), "duplicate": is_duplicate}
+        reports.append(item)
+        index[key] = len(reports) - 1
+        if len(reports) > REPORTS_CAP:
+            del reports[:-REPORTS_CAP]
+            _reindex_reports(client_id)  # trimming shifts every remaining index
+    return {"ok": True, "count": len(reports), "duplicate": is_duplicate}
 
 @app.get("/reports/recent")
-def reports_recent(limit: int = 200):
-    return REPORTS[-limit:][::-1]
+def reports_recent(uid: str = "", limit: int = 200):
+    uid = (uid or "").strip()
+    if not uid:
+        return []
+    reports = REPORTS.get(uid, [])
+    return reports[-limit:][::-1]
 
 @app.get("/reports/summary")
-def reports_summary():
-    total = len(REPORTS)
-    low = sum(1 for r in REPORTS if r.get("risk") == "Low")
-    med = sum(1 for r in REPORTS if r.get("risk") == "Medium")
-    high = sum(1 for r in REPORTS if r.get("risk") == "High")
+def reports_summary(uid: str = ""):
+    uid = (uid or "").strip()
+    reports = REPORTS.get(uid, []) if uid else []
+    total = len(reports)
+    low = sum(1 for r in reports if r.get("risk") == "Low")
+    med = sum(1 for r in reports if r.get("risk") == "Medium")
+    high = sum(1 for r in reports if r.get("risk") == "High")
     return {"total": total, "low": low, "medium": med, "high": high}
 
 @app.post("/email/score_ml")
