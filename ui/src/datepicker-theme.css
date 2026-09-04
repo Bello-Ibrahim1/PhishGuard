@@ -1,0 +1,121 @@
+/* Re-themes react-datepicker (imported before this file, in main.tsx) to match the
+   dashboard's own dark-glass/light tokens instead of shipping its default light-blue look.
+   Only the pieces actually visible here are touched — everything else falls back to the
+   library's own layout/spacing, which is already sound. */
+
+.pg-date-wrapper{ display:inline-block; }
+
+.pg-date-input{
+  background:var(--pg-card);
+  border:1px solid var(--pg-border-soft);
+  border-radius:8px;
+  color:var(--pg-text);
+  font:inherit;
+  font-size:12px;
+  padding:5px 8px;
+  width:118px;
+}
+.pg-date-input:focus{
+  outline:none;
+  border-color:var(--pg-accent-1);
+}
+.pg-date-input::placeholder{ color:var(--pg-text-faint); }
+
+/* The little "x" clear button react-datepicker draws inside the field when isClearable. */
+.react-datepicker__close-icon{ padding-right:6px; }
+.react-datepicker__close-icon::after{
+  background:var(--pg-wash-3);
+  color:var(--pg-text-sub);
+  font-size:14px;
+  width:16px;
+  height:16px;
+  line-height:16px;
+}
+
+/* ---------- The pop-open calendar itself ---------- */
+.pg-datepicker.react-datepicker{
+  font-family:var(--pg-font);
+  background:var(--pg-panel-solid);
+  border:1px solid var(--pg-border);
+  border-radius:var(--pg-r-md);
+  box-shadow:0 16px 40px -12px rgba(0,0,0,.45);
+  overflow:hidden;
+}
+.pg-datepicker .react-datepicker__triangle{ display:none; }
+
+.pg-datepicker .react-datepicker__header{
+  background:var(--pg-wash-2);
+  border-bottom:1px solid var(--pg-border-soft);
+  padding-top:10px;
+}
+.pg-datepicker .react-datepicker__current-month{
+  color:var(--pg-text);
+  font-size:13px;
+  font-weight:700;
+}
+
+/* Month/year <select> dropdowns in the header (dropdownMode="select") — clicking either
+   pops open a native list (Jan-Dec / a year range), styled dark by the color-scheme already
+   set globally in tokens.css, so these just need to look like they belong in this header. */
+.pg-datepicker .react-datepicker__month-select,
+.pg-datepicker .react-datepicker__year-select{
+  background:var(--pg-card);
+  border:1px solid var(--pg-border-soft);
+  border-radius:6px;
+  color:var(--pg-text);
+  font-size:12px;
+  font-weight:600;
+  padding:2px 4px;
+  margin:0 3px;
+}
+
+.pg-datepicker .react-datepicker__navigation-icon::before{
+  border-color:var(--pg-text-sub);
+}
+.pg-datepicker .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before{
+  border-color:var(--pg-accent-1);
+}
+
+.pg-datepicker .react-datepicker__day-names{
+  margin-top:4px;
+}
+.pg-datepicker .react-datepicker__day-name{
+  color:var(--pg-text-faint);
+  font-size:10.5px;
+  font-weight:700;
+  width:2rem;
+}
+
+.pg-datepicker .react-datepicker__month{
+  margin:6px 8px 10px;
+}
+.pg-datepicker .react-datepicker__day{
+  color:var(--pg-text);
+  width:2rem;
+  line-height:2rem;
+  border-radius:8px;
+}
+.pg-datepicker .react-datepicker__day:hover{
+  background:var(--pg-wash-3);
+}
+.pg-datepicker .react-datepicker__day--outside-month{
+  color:var(--pg-text-faint);
+}
+.pg-datepicker .react-datepicker__day--today{
+  font-weight:800;
+  color:var(--pg-accent-2);
+}
+.pg-datepicker .react-datepicker__day--keyboard-selected{
+  background:var(--pg-wash-3);
+  border-radius:8px;
+}
+.pg-datepicker .react-datepicker__day--selected,
+.pg-datepicker .react-datepicker__day--selected:hover{
+  background:var(--pg-accent-grad);
+  color:#fff;
+  font-weight:700;
+}
+.pg-datepicker .react-datepicker__day--disabled{
+  color:var(--pg-text-faint);
+  opacity:.4;
+}

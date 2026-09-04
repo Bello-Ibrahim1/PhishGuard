@@ -32,6 +32,14 @@
   --pg-wash-2:rgba(255,255,255,.05);
   --pg-wash-3:rgba(255,255,255,.06);
   --pg-scrollbar:rgba(255,255,255,.14);
+  /* Tells the browser to render its OWN native controls (date input's calendar icon and
+     pop-up calendar, in particular) in a dark-appropriate palette. Without this, the browser
+     falls back to its OS-level light/dark preference for those controls regardless of which
+     theme this page is actually showing — on this dark-by-default theme that meant a
+     near-black calendar icon sitting on a near-black input, functionally invisible even
+     though clicking it always worked. Inherited by default, so setting it once here covers
+     every native control on the page, not just the date filter. */
+  color-scheme: dark;
 }
 
 /* ---------- Light mode ----------
@@ -65,6 +73,7 @@
     --pg-wash-2:rgba(15,23,42,.05);
     --pg-wash-3:rgba(15,23,42,.06);
     --pg-scrollbar:rgba(15,23,42,.16);
+    color-scheme: light;
   }
 }
 

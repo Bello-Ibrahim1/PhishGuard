@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Report, Summary } from "../api";
 import { downloadReportsCSV, openPrintableReport } from "../export";
 import { LOCAL_TZ, formatLocalTime } from "../format";
+import { DateField } from "./DateField";
 
 // Same pill colors as the extension panel's .pg-pill.low/.medium/.high (overlay.css).
 const PILL_BG: Record<string, string> = {
@@ -198,35 +199,9 @@ export function ReportsTable({
         }}
       >
         <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--pg-text-sub)" }}>Date range:</span>
-        <input
-          type="date"
-          value={dateFrom}
-          max={dateTo || undefined}
-          onChange={(e) => setDateFrom(e.target.value)}
-          style={{
-            background: "var(--pg-card)",
-            border: "1px solid var(--pg-border-soft)",
-            borderRadius: 8,
-            color: "var(--pg-text)",
-            fontSize: 12,
-            padding: "4px 8px",
-          }}
-        />
+        <DateField value={dateFrom} onChange={setDateFrom} maxDate={dateTo} placeholder="From" />
         <span style={{ fontSize: 11.5, color: "var(--pg-text-faint)" }}>to</span>
-        <input
-          type="date"
-          value={dateTo}
-          min={dateFrom || undefined}
-          onChange={(e) => setDateTo(e.target.value)}
-          style={{
-            background: "var(--pg-card)",
-            border: "1px solid var(--pg-border-soft)",
-            borderRadius: 8,
-            color: "var(--pg-text)",
-            fontSize: 12,
-            padding: "4px 8px",
-          }}
-        />
+        <DateField value={dateTo} onChange={setDateTo} minDate={dateFrom} placeholder="To" />
         {(dateFrom || dateTo) && (
           <button
             onClick={() => {

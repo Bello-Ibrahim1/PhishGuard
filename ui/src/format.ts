@@ -23,3 +23,24 @@ export function formatLocalTime(iso?: string): string {
   if (isNaN(d.getTime())) return iso;
   return timeFormatter.format(d).replace(",", "");
 }
+
+
+// ---------- Plain "YYYY-MM-DD" <-> local Date, for the date-range filter ----------
+// Deliberately NOT `new Date(s)` / `d.toISOString().slice(0, 10)` — those parse/format in
+// UTC, which silently shifts the date by a day for anyone west of UTC (e.g. picking "Apr 1"
+// in the calendar could round-trip back out as "Mar 31"). Building/reading the Y/M/D
+// components directly keeps this a local calendar day, matching how every other date on this
+// page is already interpreted (see LOCAL_TZ above, and the date-range filter it feeds).
+export function parseYMD(s: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function formatYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
