@@ -63,31 +63,14 @@ function isDevAccount(email) {
 // signed into — no extra OAuth consent screen, since "identity" is already a granted
 // permission. If nobody's signed into the profile, or it's not an allow-listed email,
 // this silently does nothing and the page stays on the plain "ready" card.
-function showDebugLine(text) {
-  // TEMPORARY diagnostic — remove once dev-account detection is confirmed working.
-  const el = document.createElement("div");
-  el.style.cssText = "font-size:10px;opacity:.55;margin-top:10px;font-family:monospace;word-break:break-all;white-space:pre-wrap";
-  el.textContent = text;
-  document.body.appendChild(el);
-}
-
 try {
-  if (!chrome.identity) {
-    showDebugLine('DEBUG: chrome.identity is undefined in this context');
-  } else if (!chrome.identity.getProfileUserInfo) {
-    showDebugLine('DEBUG: chrome.identity exists but getProfileUserInfo is undefined');
-  } else {
-    chrome.identity.getProfileUserInfo({ accountStatus: "ANY" }, function (info) {
-      const err = chrome.runtime.lastError;
-      showDebugLine(
-        'DEBUG: info=' + JSON.stringify(info) +
-        ' lastError=' + JSON.stringify(err && err.message) +
-        ' allowlist=' + JSON.stringify(ALLOWED_DEV_EMAILS)
-      );
-      const email = info && info.email ? info.email : "";
-      if (isDevAccount(email)) buildAdvancedSection();
-    });
-  }
+  // { accountStatus: 'ANY' } returns the signed-in email regardless of whether Sync is on.
+  // Note this also requires the "identity.email" permission in manifest.json — without it,
+  // Chrome returns a blank email/id here even for a properly signed-in profile.
+  chrome.identity.getProfileUserInfo({ accountStatus: "ANY" }, function (info) {
+    const email = info && info.email ? info.email : "";
+    if (isDevAccount(email)) buildAdvancedSection();
+  });
 } catch (e) {
-  showDebugLine('DEBUG: threw ' + (e && e.message));
+  // chrome.identity unavailable for some reason — fail closed, no Advanced section.
 }
