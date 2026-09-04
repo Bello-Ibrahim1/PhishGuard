@@ -522,11 +522,11 @@
       <div id="phishguard-actions">
         <div class="pg-segmented">
           <button class="pg-seg-btn active" id="pg-scan-visible">${ICONS.scanVisible}Scan visible</button>
-          <button class="pg-seg-btn" id="pg-scan-all">${ICONS.scanAll}Scan inbox</button>
+          <button class="pg-seg-btn" id="pg-scan-all" title="Scrolls and scores what Gmail loads on screen, up to 1000 emails. On a large inbox this can stop short of the true end if Gmail's own lazy-loading falls behind the scroll — for a guaranteed complete scan, use Full inbox scan instead.">Scan loaded</button>
         </div>
         <div class="pg-row-actions">
           <button class="pg-btn" id="pg-report">Full report</button>
-          <button class="pg-btn" id="pg-scan-api" hidden title="Reads your entire inbox via the Gmail API instead of scrolling the page — not capped, but paced by Google's quota (~5 msgs/sec, so a very large inbox can take a while).">API scan</button>
+          <button class="pg-btn" id="pg-scan-api" hidden title="Reads your ENTIRE inbox via the Gmail API instead of scrolling the page — no cap, this is the one that actually covers every email. Paced by Google's quota (~5 msgs/sec), so a very large inbox can take a while.">Full inbox scan</button>
           <button class="pg-btn" id="pg-clear">Clear</button>
           <button class="pg-btn danger" id="pg-cancel">Cancel</button>
         </div>
