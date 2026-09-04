@@ -36,11 +36,17 @@ export function ReportsTable({
   // as the risk filter above it narrows what's currently shown.
   const SOURCES = ["All", "Gmail", "Outlook", "Yahoo Mail"];
   const [sourceFilter, setSourceFilter] = useState("All");
+  // Date range filter (inclusive, both ends optional) — for an IT professional pulling up
+  // "everything from Feb to April 2023", say. Plain "YYYY-MM-DD" strings straight out of the
+  // native <input type="date">; interpreted as *local* calendar days (see byDate below), same
+  // as every other timestamp on this page (formatLocalTime/LOCAL_TZ).
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   // Reset paging whenever a filter changes (or a fresh poll swaps the underlying set) so
   // switching filters doesn't leave you scrolled past the end.
   useEffect(() => {
     setVisible(PAGE);
-  }, [filter, sourceFilter]);
+  }, [filter, sourceFilter, dateFrom, dateTo]);
 
   // Sort by the email's actual timestamp (received time when known, scan time as a
   // fallback — see resolveReceivedAt() in panel.js), not by ingestion/API order. Those two
@@ -55,7 +61,22 @@ export function ReportsTable({
     return tb - ta;
   });
   const bySource = sourceFilter === "All" ? ordered : ordered.filter((r) => (r.source || "Unknown") === sourceFilter);
-  const shown = bySource.slice(0, visible);
+  // Only meaningful for emails PhishGuard has actually scanned — a row with no timestamp at
+  // all (shouldn't normally happen, but cheaper to guard than assume) is excluded rather than
+  // guessed into a range. Coverage is otherwise limited by what's been scanned: the DOM-based
+  // "Scan visible"/"Scan all" only ever sees what Gmail has rendered on screen, so reaching
+  // back to an old date range in practice means having run a Full inbox (Gmail API) scan first
+  // — that's the only path that walks the whole mailbox instead of whatever's currently open.
+  const byDate = bySource.filter((r) => {
+    if (!dateFrom && !dateTo) return true;
+    if (!r.timestamp) return false;
+    const t = new Date(r.timestamp).getTime();
+    if (isNaN(t)) return false;
+    if (dateFrom && t < new Date(`${dateFrom}T00:00:00`).getTime()) return false;
+    if (dateTo && t > new Date(`${dateTo}T23:59:59.999`).getTime()) return false;
+    return true;
+  });
+  const shown = byDate.slice(0, visible);
 
   return (
     <div
@@ -78,7 +99,7 @@ export function ReportsTable({
       >
         <div>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700 }}>
-            {filter === "All" ? "Recent Reports" : `${filter} Risk Reports`} ({bySource.length})
+            {filter === "All" ? "Recent Reports" : `${filter} Risk Reports`} ({byDate.length})
           </h3>
           <div style={{ fontSize: 11, color: "var(--pg-text-faint)", marginTop: 2 }}>
             Times shown in your local timezone ({LOCAL_TZ})
@@ -103,7 +124,7 @@ export function ReportsTable({
             </button>
           )}
           <button
-            onClick={() => downloadReportsCSV(bySource)}
+            onClick={() => downloadReportsCSV(byDate)}
             title="Download the rows currently shown below as a CSV file"
             style={{
               background: "var(--pg-wash-2)",
@@ -122,8 +143,9 @@ export function ReportsTable({
             onClick={() => {
               const scope =
                 (filter === "All" ? "all scanned emails" : `${filter} risk emails`) +
-                (sourceFilter === "All" ? "" : ` — ${sourceFilter} only`);
-              const opened = openPrintableReport(bySource, summary, scope);
+                (sourceFilter === "All" ? "" : ` — ${sourceFilter} only`) +
+                (dateFrom || dateTo ? ` — ${dateFrom || "the beginning"} to ${dateTo || "now"}` : "");
+              const opened = openPrintableReport(byDate, summary, scope);
               if (!opened) window.alert("Your browser blocked the report tab — allow pop-ups for this site and try again.");
             }}
             title="Open a clean, printable version of the rows currently shown below (Save as PDF from the print dialog)"
@@ -161,6 +183,72 @@ export function ReportsTable({
             {s}
           </button>
         ))}
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
+          marginBottom: 12,
+          padding: "8px 10px",
+          background: "var(--pg-wash-2)",
+          border: "1px solid var(--pg-border-soft)",
+          borderRadius: 10,
+        }}
+      >
+        <span style={{ fontSize: 11.5, fontWeight: 700, color: "var(--pg-text-sub)" }}>Date range:</span>
+        <input
+          type="date"
+          value={dateFrom}
+          max={dateTo || undefined}
+          onChange={(e) => setDateFrom(e.target.value)}
+          style={{
+            background: "var(--pg-card)",
+            border: "1px solid var(--pg-border-soft)",
+            borderRadius: 8,
+            color: "var(--pg-text)",
+            fontSize: 12,
+            padding: "4px 8px",
+          }}
+        />
+        <span style={{ fontSize: 11.5, color: "var(--pg-text-faint)" }}>to</span>
+        <input
+          type="date"
+          value={dateTo}
+          min={dateFrom || undefined}
+          onChange={(e) => setDateTo(e.target.value)}
+          style={{
+            background: "var(--pg-card)",
+            border: "1px solid var(--pg-border-soft)",
+            borderRadius: 8,
+            color: "var(--pg-text)",
+            fontSize: 12,
+            padding: "4px 8px",
+          }}
+        />
+        {(dateFrom || dateTo) && (
+          <button
+            onClick={() => {
+              setDateFrom("");
+              setDateTo("");
+            }}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--pg-text-sub)",
+              fontSize: 11.5,
+              fontWeight: 600,
+              cursor: "pointer",
+              padding: "4px 6px",
+            }}
+          >
+            Clear ✕
+          </button>
+        )}
+        <span style={{ fontSize: 11, color: "var(--pg-text-faint)", marginLeft: "auto" }}>
+          Only covers emails already scanned — run "Full inbox (Gmail API)" from the extension first for full historical coverage.
+        </span>
       </div>
       <div style={{ overflow: "auto", maxHeight: "60vh" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -234,7 +322,7 @@ export function ReportsTable({
             ))}
           </tbody>
         </table>
-        {visible < bySource.length && (
+        {visible < byDate.length && (
           <div style={{ textAlign: "center", padding: "12px 0 4px" }}>
             <button
               onClick={() => setVisible((v) => v + PAGE)}
@@ -249,7 +337,7 @@ export function ReportsTable({
                 cursor: "pointer",
               }}
             >
-              Load {Math.min(PAGE, bySource.length - visible)} more ({bySource.length - visible} remaining)
+              Load {Math.min(PAGE, byDate.length - visible)} more ({byDate.length - visible} remaining)
             </button>
           </div>
         )}
