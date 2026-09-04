@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import type { Report } from "../api";
+import type { Report, Summary } from "../api";
+import { downloadReportsCSV, openPrintableReport } from "../export";
+import { LOCAL_TZ, formatLocalTime } from "../format";
 
 // Same pill colors as the extension panel's .pg-pill.low/.medium/.high (overlay.css).
 const PILL_BG: Record<string, string> = {
@@ -13,38 +15,18 @@ const PILL_COLOR: Record<string, string> = {
   High: "var(--pg-danger)",
 };
 
-// PhishGuard stores every timestamp as a UTC ISO string (e.g. "2026-01-29T18:32:00.000Z" —
-// see panel.js's resolveReceivedAt()). Previously this table just sliced that string
-// ("2026-01-29 18:32:00") and displayed it as-is, which is UTC mislabeled as local time —
-// wrong by however many hours your timezone is offset from UTC. `Intl.DateTimeFormat` with
-// no explicit timeZone reads the browser's CURRENT timezone at render time instead, so this
-// is always correct for wherever you are right now: change your system timezone (or open
-// the dashboard from a different one while traveling) and the next render just picks it up
-// automatically — no GPS/location permission needed, since the OS's timezone setting is
-// already the accurate signal for "what time is it here," not raw coordinates.
-const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const timeFormatter = new Intl.DateTimeFormat(undefined, {
-  year: "numeric", month: "2-digit", day: "2-digit",
-  hour: "2-digit", minute: "2-digit", second: "2-digit",
-  hour12: false,
-});
-function formatLocalTime(iso?: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return timeFormatter.format(d).replace(",", "");
-}
-
 const PAGE = 200;
 
 export function ReportsTable({
   items,
   filter,
   onClearFilter,
+  summary,
 }: {
   items: Report[];
   filter: string;
   onClearFilter: () => void;
+  summary: Summary | null;
 }) {
   const [visible, setVisible] = useState(PAGE);
   // "All" plus every source seen in the reports so far — scanning Gmail and Outlook (or
@@ -102,9 +84,27 @@ export function ReportsTable({
             Times shown in your local timezone ({LOCAL_TZ})
           </div>
         </div>
-        {filter !== "All" && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {filter !== "All" && (
+            <button
+              onClick={onClearFilter}
+              style={{
+                background: "var(--pg-wash-2)",
+                border: "1px solid var(--pg-border-soft)",
+                borderRadius: 8,
+                color: "var(--pg-text-sub)",
+                fontSize: 11.5,
+                fontWeight: 600,
+                padding: "5px 10px",
+                cursor: "pointer",
+              }}
+            >
+              Clear filter ✕
+            </button>
+          )}
           <button
-            onClick={onClearFilter}
+            onClick={() => downloadReportsCSV(bySource)}
+            title="Download the rows currently shown below as a CSV file"
             style={{
               background: "var(--pg-wash-2)",
               border: "1px solid var(--pg-border-soft)",
@@ -116,9 +116,31 @@ export function ReportsTable({
               cursor: "pointer",
             }}
           >
-            Clear filter ✕
+            Export CSV
           </button>
-        )}
+          <button
+            onClick={() => {
+              const scope =
+                (filter === "All" ? "all scanned emails" : `${filter} risk emails`) +
+                (sourceFilter === "All" ? "" : ` — ${sourceFilter} only`);
+              const opened = openPrintableReport(bySource, summary, scope);
+              if (!opened) window.alert("Your browser blocked the report tab — allow pop-ups for this site and try again.");
+            }}
+            title="Open a clean, printable version of the rows currently shown below (Save as PDF from the print dialog)"
+            style={{
+              background: "var(--pg-accent-grad)",
+              border: "1px solid transparent",
+              borderRadius: 8,
+              color: "#fff",
+              fontSize: 11.5,
+              fontWeight: 700,
+              padding: "5px 10px",
+              cursor: "pointer",
+            }}
+          >
+            Print / Save PDF
+          </button>
+        </div>
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
         {SOURCES.map((s) => (

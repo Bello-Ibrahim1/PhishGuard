@@ -131,7 +131,7 @@ win.PhishGuardAdapter = {
   check("quarantine bar counts both (label-only counts too)", qBar.textContent.startsWith("2 phishing emails"));
 
   // ---- Restore sends gmail_label_restore with the right id and un-hides the DOM row ----
-  const restoreBtn = tags[0].querySelector(".pg-link-btn");
+  const restoreBtn = tags[0].querySelector(".pg-restore-btn");
   restoreBtn.click();
   await wait(20);
   const restoreCalls = sentMessages.filter((m) => m.cmd === "gmail_label_restore");

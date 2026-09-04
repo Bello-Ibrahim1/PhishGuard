@@ -123,7 +123,7 @@ win.PhishGuardAdapter = {
   check("deep scan result shows a flag", dsResultRow.innerHTML.includes("password field"));
 
   // ---- Restore from the card's own Restore button ----
-  const restoreBtn = quarantinedTag.querySelector(".pg-link-btn");
+  const restoreBtn = quarantinedTag.querySelector(".pg-restore-btn");
   restoreBtn.click();
   check("restoring un-hides the real inbox row", row1.style.display !== "none");
   check("quarantine bar hides again once empty", win.document.getElementById("pg-quarantine-bar").hidden === true);

@@ -233,10 +233,10 @@
     return null;
   }
 
-  function requestGmailLabel(localId, gmailId, cmd) {
+  function requestGmailLabel(localId, gmailId, cmd, interactive) {
     if (!(chrome.runtime && typeof chrome.runtime.sendMessage === 'function')) return;
     try {
-      chrome.runtime.sendMessage({ cmd, msgId: gmailId }, (resp) => {
+      chrome.runtime.sendMessage({ cmd, msgId: gmailId, interactive: !!interactive }, (resp) => {
         if (chrome.runtime.lastError) return; // no receiving end (e.g. SW asleep) — best-effort only
         if (cmd !== 'gmail_label_quarantine') return;
         const q = quarantined.get(localId);
@@ -246,6 +246,19 @@
         renderQuarantineTag(q);
       });
     } catch (_) {}
+  }
+
+  // User-initiated retry for a quarantine tag stuck in 'error' (almost always: the
+  // gmail.modify scope was never granted yet, because a Full inbox (Gmail API) scan has
+  // never been run). Unlike the automatic real-time path, this is a deliberate click, so
+  // it's fine for it to pop Google's consent screen.
+  function retryGmailLabel(localId) {
+    const q = quarantined.get(localId);
+    if (!q || !q.gmailId) return;
+    q.labelState = 'pending';
+    q.labelError = null;
+    renderQuarantineTag(q);
+    requestGmailLabel(localId, q.gmailId, 'gmail_label_quarantine', true);
   }
 
   function quarantineEmail(email, api) {
@@ -297,6 +310,8 @@
     if (!q.tagEl || !q.tagEl.isConnected) return;
     const span = q.tagEl.querySelector('span');
     if (span) span.innerHTML = pgHtml(`${ICONS.shield} ${esc(quarantineTagText(q))}`);
+    const retryBtn = q.tagEl.querySelector('.pg-retry-gmail-btn');
+    if (retryBtn) retryBtn.hidden = q.labelState !== 'error';
   }
 
   function restoreAllQuarantined() {
@@ -615,11 +630,20 @@
       const tag = document.createElement('div');
       tag.className = 'pg-quarantined-tag';
       tag.innerHTML = pgHtml(`<span></span>`);
+      const actions = document.createElement('div');
+      actions.className = 'pg-quarantine-actions';
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'pg-link-btn pg-retry-gmail-btn';
+      retryBtn.textContent = 'Grant Gmail access';
+      retryBtn.hidden = true;
+      retryBtn.onclick = (ev) => { ev.stopPropagation(); retryGmailLabel(opts.msgId); };
       const restoreBtn = document.createElement('button');
-      restoreBtn.className = 'pg-link-btn';
+      restoreBtn.className = 'pg-link-btn pg-restore-btn';
       restoreBtn.textContent = 'Restore';
       restoreBtn.onclick = (ev) => { ev.stopPropagation(); restoreEmail(opts.msgId); };
-      tag.appendChild(restoreBtn);
+      actions.appendChild(retryBtn);
+      actions.appendChild(restoreBtn);
+      tag.appendChild(actions);
       el.appendChild(tag);
       attachQuarantineTag(opts.msgId, tag);
     }
