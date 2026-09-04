@@ -424,7 +424,12 @@
     if (realtimeEnabled) startRealtimeProtection(); else stopRealtimeProtection();
   }
 
-  // ---------- Sandboxed link deep-scan (on-demand) ----------
+  // ---------- Sandboxed link deep-scan ----------
+  // Medium/High risk emails get their links deep-scanned automatically (no click
+  // needed) the first time each email's card is built. Tracked by message id so a
+  // real-time re-render of the same email never re-triggers it. Low-risk emails still
+  // show the manual "Deep scan" button for on-demand use.
+  const autoDeepScanned = new Set();
   function pillClassForRisk(risk) {
     if (risk === 'High' || risk === 'Blocked') return 'high';
     if (risk === 'Medium') return 'medium';
@@ -632,6 +637,16 @@
       wrap.appendChild(dsBtn);
       wrap.appendChild(dsResults);
       el.appendChild(wrap);
+
+      // Auto-run for Medium/High risk — the whole point is the user never has to click a
+      // suspicious link (or the deep-scan button) themselves to find out where it goes.
+      // Dedup key falls back to sender+subject when there's no real message id, so a
+      // Low->re-render or duplicate build still won't double-fire.
+      const autoKey = opts.msgId || `${meta?.sender || ''}|${meta?.subject || ''}`;
+      if ((risk === 'High' || risk === 'Medium') && !autoDeepScanned.has(autoKey)) {
+        autoDeepScanned.add(autoKey);
+        runDeepScan(urls, dsBtn, dsResults);
+      }
     }
 
     return el;
