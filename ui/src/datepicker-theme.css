@@ -5,6 +5,12 @@
 
 .pg-date-wrapper{ display:inline-block; }
 
+/* Belt-and-suspenders alongside portalId in DateField.tsx: portaling to the end of <body>
+   already keeps this out of the reports table's sticky-header stacking context, and an
+   explicit z-index here means it stays on top even if something else on the page ever picks
+   up its own z-index later. */
+.react-datepicker-popper{ z-index:60; }
+
 .pg-date-input{
   background:var(--pg-card);
   border:1px solid var(--pg-border-soft);
