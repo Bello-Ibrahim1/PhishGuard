@@ -115,8 +115,51 @@
 
   const DEFAULT_API = "https://phishguard-api-877x.onrender.com";
   const DEFAULT_DASHBOARD = "https://phish-guard-swart.vercel.app";
-  function getApiBase() { return new Promise(r => { chrome.storage.sync.get({ apiBase: DEFAULT_API }, o => r(o.apiBase || DEFAULT_API)); }); }
-  function getDashboardUrl() { return new Promise(r => { chrome.storage.sync.get({ dashboardUrl: DEFAULT_DASHBOARD }, o => r(o.dashboardUrl || DEFAULT_DASHBOARD)); }); }
+
+  // Before Advanced settings existed, some profiles (mine included, while testing) saved a
+  // literal "http://localhost:..." into storage as their apiBase/dashboardUrl. That value
+  // now permanently overrides the hosted default with no way for a non-dev account to see
+  // or clear it, since the Settings fields that could fix it are only shown to the
+  // developer's own account. Self-heal instead: if what's stored looks like a local dev
+  // address, treat it as stale, fall back to the real hosted URL, and quietly overwrite the
+  // bad value so this only ever has to correct itself once per profile.
+  function isLocalUrl(url) {
+    return typeof url === "string" && /^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/i.test(url.trim());
+  }
+  function getApiBase() {
+    return new Promise(r => {
+      chrome.storage.sync.get({ apiBase: DEFAULT_API }, o => {
+        if (!o.apiBase || isLocalUrl(o.apiBase)) {
+          chrome.storage.sync.set({ apiBase: DEFAULT_API });
+          r(DEFAULT_API);
+        } else {
+          r(o.apiBase);
+        }
+      });
+    });
+  }
+  function getDashboardUrl() {
+    // Also appends this install's private id as ?uid=... — every caller of
+    // getDashboardUrl() gets a correctly-scoped link for free instead of each having to
+    // remember to add it (a real bug in an earlier version: the in-panel "Full report"
+    // button called this directly and never got the id appended at all).
+    return new Promise(r => {
+      chrome.storage.sync.get({ dashboardUrl: DEFAULT_DASHBOARD }, o => {
+        const finish = (base) => {
+          getClientId().then(id => {
+            const sep = base.includes("?") ? "&" : "?";
+            r(base + sep + "uid=" + encodeURIComponent(id));
+          });
+        };
+        if (!o.dashboardUrl || isLocalUrl(o.dashboardUrl)) {
+          chrome.storage.sync.set({ dashboardUrl: DEFAULT_DASHBOARD });
+          finish(DEFAULT_DASHBOARD);
+        } else {
+          finish(o.dashboardUrl);
+        }
+      });
+    });
+  }
 
   // A private, random per-install id — generated once and kept in chrome.storage.sync (so
   // it follows this Chrome profile across machines, same as every other PhishGuard
