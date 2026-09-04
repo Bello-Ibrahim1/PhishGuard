@@ -203,13 +203,20 @@ export function ReportsTable({
           value={dateFrom}
           max={dateTo || undefined}
           onChange={(e) => setDateFrom(e.target.value)}
+          // Native <input type="date"> already supports both typing (click/tab into the day,
+          // month, or year segment and type digits) and picking (click the calendar icon for
+          // a full pop-up) — the calendar icon's actual visibility against this dark input
+          // comes from the global `color-scheme` set once in tokens.css, which the browser
+          // uses for every native control on the page (inherited, so no per-input override
+          // needed here).
           style={{
             background: "var(--pg-card)",
             border: "1px solid var(--pg-border-soft)",
             borderRadius: 8,
             color: "var(--pg-text)",
             fontSize: 12,
-            padding: "4px 8px",
+            padding: "5px 8px",
+            minWidth: 132,
           }}
         />
         <span style={{ fontSize: 11.5, color: "var(--pg-text-faint)" }}>to</span>
@@ -224,7 +231,8 @@ export function ReportsTable({
             borderRadius: 8,
             color: "var(--pg-text)",
             fontSize: 12,
-            padding: "4px 8px",
+            padding: "5px 8px",
+            minWidth: 132,
           }}
         />
         {(dateFrom || dateTo) && (
