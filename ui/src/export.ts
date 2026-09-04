@@ -114,8 +114,13 @@ export function openPrintableReport(items: Report[], summary: Summary | null, sc
 </body>
 </html>`;
 
-  const win = window.open("", "_blank", "noopener,noreferrer");
-  if (!win) return false; // popup blocked — caller should tell the user to allow popups
+  // No "noopener"/"noreferrer" here on purpose: this opens a blank tab and writes our own
+  // generated HTML into it (never a third-party URL), so there's no reverse-tabnabbing risk
+  // to guard against — and critically, passing "noopener" makes window.open() return null by
+  // spec (the caller deliberately gives up the reference), which was making this look like a
+  // blocked popup on every single click, not just when a real popup blocker stepped in.
+  const win = window.open("", "_blank");
+  if (!win) return false; // an actual popup blocker stepped in — caller should tell the user to allow popups
   win.document.open();
   win.document.write(html);
   win.document.close();
