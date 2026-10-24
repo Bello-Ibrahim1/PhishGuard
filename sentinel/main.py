@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from .features import extract_email_features
 from .model import load_model, score_text
+from .claude_check import claude_phish_probability
 
 app=FastAPI()
 app.add_middleware(
@@ -61,7 +62,7 @@ class BatchScoreIn(BaseModel):
 
 @app.on_event("startup")
 def _load_model():
-    load_model("ml/models/phish_clf.joblib")
+    load_model()  # picks single vs ensemble model based on PHISHGUARD_MODEL_VARIANT
 
 # --- High-accuracy heuristics: wording + identifiers (legit vs fraud) ---
 URL_RE = re.compile(r'https?://[^\s)\]\"]+', re.I)
@@ -341,6 +342,30 @@ def heuristic_score(subject: str, body: str, sender: str = ""):
         score = max(0, score - 4)
     return min(score, 10), reasons[:5], urls, domains
 
+def _blend_with_claude(model_prob: float, subject: str, body: str, sender: str) -> Tuple[float, Optional[float]]:
+    """
+    Optionally blend the trained model's phishing probability with Claude's independent
+    opinion (see claude_check.py), as a genuine weighted vote rather than a hard override --
+    each "expert" contributes a percentage, and the final probability is a weighted average
+    of however many experts actually ran.
+
+    Returns (blended_prob, claude_prob_or_None). When Claude is disabled (no API key, or
+    PHISHGUARD_CLAUDE_ENABLED=0) or the call fails, claude_prob is None and blended_prob is
+    just model_prob unchanged -- so behavior is identical to before this existed unless
+    Claude is explicitly turned on.
+    """
+    c_prob = claude_phish_probability(subject, body, sender)
+    if c_prob is None:
+        return model_prob, None
+    try:
+        claude_weight = float(os.environ.get("PHISHGUARD_CLAUDE_WEIGHT", "0.35"))
+    except ValueError:
+        claude_weight = 0.35
+    claude_weight = max(0.0, min(1.0, claude_weight))
+    blended = (1 - claude_weight) * model_prob + claude_weight * c_prob
+    return blended, c_prob
+
+
 # --- Unified risk classification (efficient, evidence-based) ---
 def _has_strong_phish_evidence(heur_reasons: List[str]) -> bool:
     """True if reasons include high-confidence phish signals (not just single words like 'payment')."""
@@ -416,7 +441,10 @@ def scan_batch(inp: BatchScoreIn):
         text = f"{subject} {body}"
         model_out = score_text(text)
         prob = float(model_out.get("prob_phish", 0.0))
+        prob, claude_prob = _blend_with_claude(prob, subject, body, sender)
         h_score, h_reasons, urls, domains = heuristic_score(subject, body, sender)
+        if claude_prob is not None:
+            h_reasons = [f"Claude second opinion: {claude_prob*100:.0f}% likely phishing"] + h_reasons
         trusted_sender = _is_trusted_domain(domain) and not _brand_impersonation(sender, subject, body)[0]
         total, risk, _ = classify_risk(prob, h_score, h_reasons, trusted_sender)
         threat_pct = round(min(10, total) / 10 * 100)  # derived from final (trust/impersonation-adjusted) score, not raw prob
@@ -449,6 +477,7 @@ def scan_gmail(max_results: int = 50):
     def score_fn(s: str, b: str):
         model_out = score_text(f"{s} {b}")
         prob = float(model_out.get("prob_phish", 0.0))
+        prob, _ = _blend_with_claude(prob, s, b, "")
         h_score, h_reasons, _, _ = heuristic_score(s, b, "")
         total, risk, _ = classify_risk(prob, h_score, h_reasons, trusted_sender=False)
         return {"risk": risk, "threat_pct": round((prob or (total / 10)) * 100)}
@@ -480,12 +509,15 @@ def email_score(inp: ScoreIn):
     domain = _sender_domain(sender)
     trusted_sender = _is_trusted_domain(domain) and not _brand_impersonation(sender, subject, body)[0]
 
-    # 1) Model probability
+    # 1) Model probability (optionally blended with Claude's independent opinion)
     model_out = score_text(text)
     prob = float(model_out.get("prob_phish", 0.0))
+    prob, claude_prob = _blend_with_claude(prob, subject, body, sender)
 
     # 2) Heuristics (trusted senders get lower score for "payment" etc.)
     h_score, h_reasons, urls, domains = heuristic_score(subject, body, sender)
+    if claude_prob is not None:
+        h_reasons = [f"Claude second opinion: {claude_prob*100:.0f}% likely phishing"] + h_reasons
 
     # 3) Unified risk classification (evidence-based, efficient)
     total, risk, model_pts = classify_risk(prob, h_score, h_reasons, trusted_sender)

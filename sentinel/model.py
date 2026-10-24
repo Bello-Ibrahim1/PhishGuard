@@ -1,14 +1,35 @@
+import os
 from pathlib import Path
 import joblib
 
 _MODEL = None
 
+# Which trained model file to load. "single" = the original single LogisticRegression
+# model (phish_clf.joblib). "ensemble" = the soft-voting ensemble of LogisticRegression +
+# linear SVM (SGDClassifier) + MultinomialNB (phish_clf_ensemble.joblib, built by
+# ml/train_ensemble.py). Controlled by PHISHGUARD_MODEL_VARIANT so this can be switched
+# without touching any call site -- default stays "single" so behavior doesn't change
+# unless this is explicitly opted into.
+_VARIANT_PATHS = {
+    "single": "ml/models/phish_clf.joblib",
+    "ensemble": "ml/models/phish_clf_ensemble.joblib",
+}
+
+
 def _project_root() -> Path:
     """Project root (parent of sentinel package). Works from any cwd."""
     return Path(__file__).resolve().parent.parent
 
-def load_model(path: str = "ml/models/phish_clf.joblib"):
+
+def default_model_path() -> str:
+    variant = os.environ.get("PHISHGUARD_MODEL_VARIANT", "single").strip().lower()
+    return _VARIANT_PATHS.get(variant, _VARIANT_PATHS["single"])
+
+
+def load_model(path: str = None):
     global _MODEL
+    if path is None:
+        path = default_model_path()
     p = Path(path)
     if not p.is_absolute():
         p = _project_root() / path

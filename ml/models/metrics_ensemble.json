@@ -1,0 +1,37 @@
+{
+  "model": "ensemble(logreg+sgd_svm+nb, soft voting)",
+  "samples_train": 27680,
+  "samples_test": 6921,
+  "auc": 0.9992900276506316,
+  "accuracy": 0.9908972691807543,
+  "precision": 0.9894195024306548,
+  "recall": 0.9925415949512335,
+  "f1": 0.9909780896462839,
+  "precision_recall_f1": {
+    "0": {
+      "precision": 0.9924065420560748,
+      "recall": 0.9892285298398835,
+      "f1-score": 0.990814987607523,
+      "support": 3435.0
+    },
+    "1": {
+      "precision": 0.9894195024306548,
+      "recall": 0.9925415949512335,
+      "f1-score": 0.9909780896462839,
+      "support": 3486.0
+    },
+    "accuracy": 0.9908972691807543,
+    "macro avg": {
+      "precision": 0.9909130222433649,
+      "recall": 0.9908850623955585,
+      "f1-score": 0.9908965386269034,
+      "support": 6921.0
+    },
+    "weighted avg": {
+      "precision": 0.9909020166790752,
+      "recall": 0.9908972691807543,
+      "f1-score": 0.9908971395663614,
+      "support": 6921.0
+    }
+  }
+}

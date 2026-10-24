@@ -13,3 +13,9 @@ services:
         value: ""
       - key: PHISHGUARD_OPENAI_ENABLED
         value: "0"
+      - key: PHISHGUARD_MODEL_VARIANT
+        value: "single"
+      - key: PHISHGUARD_CLAUDE_ENABLED
+        value: "0"
+      - key: ANTHROPIC_API_KEY
+        sync: false

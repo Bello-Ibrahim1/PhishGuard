@@ -6,3 +6,4 @@ joblib==1.6.0
 python-multipart==0.0.32
 requests==2.34.2
 openai==3.6.0
+anthropic==2.3.0
